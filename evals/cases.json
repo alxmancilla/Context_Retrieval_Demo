@@ -1,0 +1,44 @@
+[
+  {
+    "id": "rx-auth-conflict",
+    "prompt": "How do external partners authenticate to the Rx API today, and are any sources outdated?",
+    "claim": "rx_auth_protocol",
+    "preferred_value": "oauth2_pkce",
+    "preferred_artifact": "github-rx-auth-implementation",
+    "stale_artifacts": ["confluence-legacy-rx-auth", "teams-auth-migration-chat"],
+    "required_term_groups": [["oauth 2", "oauth2"], ["pkce"]]
+  },
+  {
+    "id": "pa-delivery-conflict",
+    "prompt": "For prior auth, should clients poll for status or consume events? What changed and when?",
+    "claim": "pa_status_delivery",
+    "preferred_value": "events",
+    "preferred_artifact": "github-pa-status-events",
+    "stale_artifacts": ["confluence-pa-polling-runbook"],
+    "required_term_groups": [["event"], ["poll"]]
+  },
+  {
+    "id": "eligibility-cache-conflict",
+    "prompt": "What is the current eligibility caching strategy? Include TTL values and the incident that drove the change.",
+    "claim": "eligibility_cache_ttl",
+    "preferred_value": "5_minutes",
+    "preferred_artifact": "github-eligibility-cache",
+    "stale_artifacts": ["confluence-eligibility-cache-design"],
+    "required_term_groups": [["5-minute", "5 minute", "5 minutes"], ["30-second", "30 second", "30 seconds"]]
+  },
+  {
+    "id": "phi-logging-conflict",
+    "prompt": "What is the documented PHI logging policy, and how does it differ from old troubleshooting practices?",
+    "claim": "phi_logging",
+    "preferred_value": "redacted",
+    "preferred_artifact": "sharepoint-phi-logging-policy",
+    "stale_artifacts": ["teams-debug-payloads"],
+    "representatives": {
+      "redacted": "sharepoint-phi-logging-policy",
+      "raw_payloads": "teams-debug-payloads"
+    },
+    "require_canonical_winner": true,
+    "max_source_appendix_artifacts": 6,
+    "required_term_groups": [["redact"], ["raw payload"], ["suggest"]]
+  }
+]

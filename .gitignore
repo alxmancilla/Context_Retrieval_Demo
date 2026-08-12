@@ -1,0 +1,27 @@
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.chainlit/translations/
+.files/
+*.log
+.DS_Store
+
+# Private keys and exported credentials must never enter source control.
+*.pem
+*.key
+*.p12
+*.pfx
+credentials*.json
+secrets*.json
+evals/results/

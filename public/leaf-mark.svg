@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Context Platform leaf mark">
+  <rect width="64" height="64" rx="18" fill="#001E2B"/>
+  <path d="M32 9C22 19 17 28 19 38c2 9 8 14 13 17 5-3 11-8 13-17 2-10-3-19-13-29Z" fill="#00ED64"/>
+  <path d="M32 17v37" stroke="#00684A" stroke-width="3" stroke-linecap="round"/>
+  <path d="m32 33 8-8M32 41l-8-8" stroke="#00684A" stroke-width="2" stroke-linecap="round"/>
+</svg>
