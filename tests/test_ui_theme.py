@@ -3,7 +3,7 @@ from pathlib import Path
 
 from chainlit.config import load_config
 
-from chainlit_app import STARTER_PROMPTS
+from chainlit_app import STARTER_PROMPTS, should_stream_draft
 
 
 def test_mongodb_theme_assets_and_configuration():
@@ -37,3 +37,8 @@ def test_starter_catalog_covers_enterprise_evaluation_scenarios():
     combined = " ".join(messages).lower()
     for topic in ("oauth", "prior authorization", "eligibility", "phi", "authority", "architecture"):
         assert topic in combined
+
+
+def test_production_buffers_unverified_draft_tokens():
+    assert should_stream_draft("local") is True
+    assert should_stream_draft("production") is False

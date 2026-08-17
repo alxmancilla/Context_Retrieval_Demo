@@ -6,6 +6,8 @@ from pymongo.errors import OperationFailure
 from core.schemas import SourceHit, SourceName
 
 SOURCE_VECTOR_INDEX = "content_vector_acl"
+CONTRADICTION_PROBE_SCAN_LIMIT = 10
+CONTRADICTION_ALTERNATE_VALUE_LIMIT = 3
 
 
 class SearchIndexNotReady(RuntimeError):
@@ -104,9 +106,13 @@ class SourceAgent:
                     {f"claims.{claim}": {"$exists": True, "$nin": list(observed_values)}},
                 ]},
                 projection,
-            ).sort("updated_at", -1).limit(1)
+            ).sort("updated_at", -1).limit(CONTRADICTION_PROBE_SCAN_LIMIT)
+            added_values: set[str] = set()
             for candidate in cursor:
                 if candidate["artifact_id"] in existing_ids:
+                    continue
+                alternate_value = str(candidate.get("claims", {}).get(claim, ""))
+                if not alternate_value or alternate_value in added_values:
                     continue
                 metadata = dict(candidate.get("metadata", {}))
                 metadata["retrieval_reason"] = "contradiction_probe"
@@ -114,4 +120,7 @@ class SourceAgent:
                 candidate["vector_score"] = 0.0
                 expanded.append(SourceHit.model_validate(candidate).model_dump())
                 existing_ids.add(candidate["artifact_id"])
+                added_values.add(alternate_value)
+                if len(added_values) >= CONTRADICTION_ALTERNATE_VALUE_LIMIT:
+                    break
         return expanded

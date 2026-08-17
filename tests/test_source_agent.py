@@ -90,3 +90,46 @@ def test_contradiction_probe_is_permission_scoped_and_conservative():
     assert rows[1]["metadata"]["retrieval_reason"] == "contradiction_probe"
     assert {"realm_id": "realm-a"} in collection.query["$and"]
     assert {"access_principals": {"$in": ["role:platform-engineer"]}} in collection.query["$and"]
+
+
+def test_contradiction_probe_keeps_one_representative_per_alternate_value():
+    class Cursor(list):
+        def sort(self, *_args):
+            return self
+
+        def limit(self, amount):
+            return Cursor(self[:amount])
+
+    class Collection:
+        def find(self, _query, _projection):
+            return Cursor([
+                {
+                    "artifact_id": "old-1", "source": "github", "title": "Old one",
+                    "content": "OAuth 1", "url": "https://demo/old-1",
+                    "updated_at": "2024-01-03T00:00:00Z",
+                    "claims": {"auth": "oauth1"}, "metadata": {},
+                },
+                {
+                    "artifact_id": "old-2", "source": "github", "title": "Old duplicate",
+                    "content": "OAuth 1", "url": "https://demo/old-2",
+                    "updated_at": "2024-01-02T00:00:00Z",
+                    "claims": {"auth": "oauth1"}, "metadata": {},
+                },
+                {
+                    "artifact_id": "legacy", "source": "github", "title": "Legacy",
+                    "content": "API key", "url": "https://demo/legacy",
+                    "updated_at": "2024-01-01T00:00:00Z",
+                    "claims": {"auth": "api_key"}, "metadata": {},
+                },
+            ])
+
+    current = {
+        "artifact_id": "current", "source": "github", "title": "Current",
+        "content": "OAuth 2", "url": "https://demo/current",
+        "updated_at": "2026-08-01T00:00:00Z", "vector_score": 0.9,
+        "claims": {"auth": "oauth2"}, "metadata": {},
+    }
+    rows = SourceAgent(Collection(), "github", 5)._with_contradiction_candidates(
+        [current], "realm", ["role:platform-engineer"]
+    )
+    assert [row["claims"]["auth"] for row in rows] == ["oauth2", "oauth1", "api_key"]

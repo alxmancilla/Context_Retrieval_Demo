@@ -1,6 +1,7 @@
 import os
 from dataclasses import dataclass
 from functools import lru_cache
+from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 
@@ -48,6 +49,24 @@ def _bounded_float(name: str, default: float, minimum: float, maximum: float) ->
     value = float(os.getenv(name, str(default)))
     if not minimum <= value <= maximum:
         raise ValueError(f"{name} must be between {minimum} and {maximum}")
+    return value
+
+
+def _strong_secret(name: str, minimum_length: int = 32) -> str:
+    value = _required(name)
+    placeholders = ("<", "change-me", "changeme", "replace-me", "example")
+    if len(value) < minimum_length or any(marker in value.lower() for marker in placeholders):
+        raise ValueError(f"{name} must be a non-placeholder secret of at least {minimum_length} characters")
+    return value
+
+
+def _provider_url(name: str, default: str, app_env: str) -> str:
+    value = os.getenv(name, default).rstrip("/")
+    parsed = urlparse(value)
+    if not parsed.hostname or parsed.scheme not in {"http", "https"}:
+        raise ValueError(f"{name} must be an absolute HTTP(S) URL")
+    if app_env == "production" and parsed.scheme != "https":
+        raise ValueError(f"{name} must use HTTPS when APP_ENV=production")
     return value
 
 
@@ -107,30 +126,35 @@ def get_settings() -> Settings:
     if app_env == "production" and auth_mode == "disabled":
         raise ValueError("AUTH_MODE must be enabled when APP_ENV=production")
     if auth_mode == "password":
-        _required("CHAINLIT_AUTH_SECRET")
+        _strong_secret("CHAINLIT_AUTH_SECRET")
         auth_username, auth_password = _required("AUTH_USERNAME"), _required("AUTH_PASSWORD")
     else:
         auth_username, auth_password = None, None
     return Settings(
         mongodb_uri=_required("MONGODB_URI"),
         mongodb_db=os.getenv("MONGODB_DB", "cmm_context_demo"),
-        mongodb_server_selection_timeout_ms=int(
-            os.getenv("MONGODB_SERVER_SELECTION_TIMEOUT_MS", "5000")
+        mongodb_server_selection_timeout_ms=_bounded_int(
+            "MONGODB_SERVER_SELECTION_TIMEOUT_MS", 5000, 100, 120_000
         ),
-        mongodb_connect_timeout_ms=int(os.getenv("MONGODB_CONNECT_TIMEOUT_MS", "10000")),
-        mongodb_socket_timeout_ms=int(os.getenv("MONGODB_SOCKET_TIMEOUT_MS", "60000")),
+        mongodb_connect_timeout_ms=_bounded_int(
+            "MONGODB_CONNECT_TIMEOUT_MS", 10_000, 100, 120_000
+        ),
+        mongodb_socket_timeout_ms=_bounded_int(
+            "MONGODB_SOCKET_TIMEOUT_MS", 60_000, 1000, 300_000
+        ),
         grove_api_key=_required("GROVE_API_KEY"),
-        grove_base_url=os.getenv(
+        grove_base_url=_provider_url(
             "GROVE_BASE_URL",
             "https://grove-gateway-prod.azure-api.net/"
             "grove-foundry-prod/openai/v1",
+            app_env,
         ),
         grove_model=os.getenv("GROVE_MODEL", "gpt-5.6-sol"),
         realm_id=os.getenv("REALM_ID", "cmm-demo"),
         user_id=os.getenv("USER_ID", "demo-user"),
         agent_id=os.getenv("AGENT_ID", "cmm-context-assistant"),
-        source_top_k=int(os.getenv("SOURCE_TOP_K", "5")),
-        memory_top_k=int(os.getenv("MEMORY_TOP_K", "3")),
+        source_top_k=_bounded_int("SOURCE_TOP_K", 5, 1, 50),
+        memory_top_k=_bounded_int("MEMORY_TOP_K", 3, 1, 20),
         access_principals=_csv("ACCESS_PRINCIPALS", "role:platform-engineer"),
         auth_mode=auth_mode,
         auth_username=auth_username,

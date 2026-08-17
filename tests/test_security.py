@@ -67,3 +67,45 @@ def test_runtime_profile_values_are_strict(monkeypatch):
     monkeypatch.setenv("AUTH_MODE", "none")
     with pytest.raises(ValueError, match="AUTH_MODE"):
         configured_auth_mode()
+
+
+def test_password_mode_rejects_weak_chainlit_signing_secret(monkeypatch):
+    monkeypatch.setenv("AUTH_MODE", "password")
+    monkeypatch.setenv("CHAINLIT_AUTH_SECRET", "change-me")
+    monkeypatch.setenv("AUTH_USERNAME", "alice")
+    monkeypatch.setenv("AUTH_PASSWORD", "correct-horse")
+    get_settings.cache_clear()
+    with pytest.raises(ValueError, match="CHAINLIT_AUTH_SECRET"):
+        get_settings()
+    get_settings.cache_clear()
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("SOURCE_TOP_K", "0"),
+        ("MEMORY_TOP_K", "21"),
+        ("MONGODB_SERVER_SELECTION_TIMEOUT_MS", "0"),
+        ("MONGODB_CONNECT_TIMEOUT_MS", "120001"),
+        ("MONGODB_SOCKET_TIMEOUT_MS", "999"),
+    ],
+)
+def test_runtime_rejects_unbounded_retrieval_and_timeout_values(monkeypatch, name, value):
+    monkeypatch.setenv(name, value)
+    get_settings.cache_clear()
+    with pytest.raises(ValueError, match=name):
+        get_settings()
+    get_settings.cache_clear()
+
+
+def test_production_rejects_non_https_grove_endpoint(monkeypatch):
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("AUTH_MODE", "password")
+    monkeypatch.setenv("CHAINLIT_AUTH_SECRET", "a-secure-random-signing-secret-value")
+    monkeypatch.setenv("AUTH_USERNAME", "alice")
+    monkeypatch.setenv("AUTH_PASSWORD", "correct-horse")
+    monkeypatch.setenv("GROVE_BASE_URL", "http://grove.example/v1")
+    get_settings.cache_clear()
+    with pytest.raises(ValueError, match="GROVE_BASE_URL must use HTTPS"):
+        get_settings()
+    get_settings.cache_clear()

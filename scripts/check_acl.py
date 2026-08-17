@@ -2,7 +2,12 @@
 
 from core.settings import get_settings
 from core.source_agents import SOURCE_VECTOR_INDEX, SourceAgent
+from data.seed_data import all_artifacts
 from db.bootstrap import connect
+
+
+def expected_acl_documents(realm_id: str, source: str = "github") -> int:
+    return sum(row["source"] == source for row in all_artifacts(realm_id))
 
 
 def main() -> None:
@@ -38,7 +43,14 @@ def main() -> None:
         print("unknown_results=", len(denied))
         print("index_status=", index.get("status"))
         print("index_fields=", fields)
-        if acl_documents != 128 or not allowed or denied or index.get("status") != "READY":
+        expected_count = expected_acl_documents(settings.realm_id)
+        print("expected_acl_documents=", expected_count)
+        if (
+            acl_documents != expected_count
+            or not allowed
+            or denied
+            or index.get("status") != "READY"
+        ):
             raise SystemExit("ACL diagnostic failed")
     finally:
         client.close()

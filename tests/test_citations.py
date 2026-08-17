@@ -89,6 +89,16 @@ def test_binder_does_not_double_link_existing_inline_citation():
     assert bound.count("[github:gh](https://demo/gh)") == 2
 
 
+def test_binder_replaces_model_supplied_url_before_binding():
+    answer = "Current [github:gh](javascript:alert(1)); old [source:old](https://evil.test)."
+    hits = [_hit("gh", "github"), _hit("old", "teams")]
+    bound = bind_source_links(answer, hits, [])
+    assert "javascript:" not in bound
+    assert "evil.test" not in bound
+    assert "[github:gh](https://demo/gh)" in bound
+    assert "[teams:old](https://demo/old)" in bound
+
+
 def test_binder_links_literal_multiline_source_placeholders_in_rank_order():
     hits = [_hit("gh-current", "github"), _hit("conf-old", "confluence")]
     answer = "Current behavior. [source\n] [source]\n\nLegacy guidance. [Source 3\n]"

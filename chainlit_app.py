@@ -1,3 +1,6 @@
+import asyncio
+import atexit
+from dataclasses import dataclass
 from typing import Any, cast
 from uuid import uuid4
 
@@ -11,7 +14,7 @@ from core.observability import configure_logging, get_logger, log_failure
 from core.providers.chat import GroveChatProvider
 from core.providers.rerank import create_voyage_reranker
 from core.security import credentials_match, resolve_access_context
-from core.settings import configured_auth_mode, get_settings
+from core.settings import Settings, configured_auth_mode, get_settings
 from db.bootstrap import connect
 from ui.presentation import (
     contradictions_markdown,
@@ -22,6 +25,17 @@ from ui.presentation import (
 )
 
 LOGGER = get_logger("chainlit")
+
+
+@dataclass(frozen=True)
+class AppRuntime:
+    client: Any
+    graph: Any
+    settings: Settings
+
+
+_RUNTIME: AppRuntime | None = None
+_RUNTIME_LOCK = asyncio.Lock()
 
 
 STARTER_PROMPTS = (
@@ -61,46 +75,75 @@ async def starters(_user: cl.User | None) -> list[cl.Starter]:
     return [cl.Starter(label=label, message=message) for label, message in STARTER_PROMPTS]
 
 
-async def _initialize_session() -> None:
-    settings = get_settings()
+def _build_runtime(settings: Settings) -> AppRuntime:
     configure_logging(settings.log_level)
-    user = cl.user_session.get("user")
-    access = resolve_access_context(
-        settings,
-        identifier=getattr(user, "identifier", None),
-        metadata=getattr(user, "metadata", None),
-    )
-    client, db = await cl.make_async(connect)(
+    client, db = connect(
         settings.mongodb_uri,
         settings.mongodb_db,
         server_selection_timeout_ms=settings.mongodb_server_selection_timeout_ms,
         connect_timeout_ms=settings.mongodb_connect_timeout_ms,
         socket_timeout_ms=settings.mongodb_socket_timeout_ms,
     )
-    chat = GroveChatProvider(
-        api_key=settings.grove_api_key,
-        base_url=settings.grove_base_url,
-        model=settings.grove_model,
-        timeout_seconds=settings.grove_timeout_seconds,
-        max_retries=settings.grove_max_retries,
+    try:
+        chat = GroveChatProvider(
+            api_key=settings.grove_api_key,
+            base_url=settings.grove_base_url,
+            model=settings.grove_model,
+            timeout_seconds=settings.grove_timeout_seconds,
+            max_retries=settings.grove_max_retries,
+        )
+        nodes = AgentNodes(
+            db, chat, settings.source_top_k, settings.memory_top_k,
+            settings.memory_retention_days, settings.memory_max_per_user,
+            reconciliation_weights=settings.reconciliation_weights,
+            reranker=create_voyage_reranker(
+                api_key=settings.voyage_api_key,
+                model=settings.voyage_rerank_model,
+                timeout_seconds=settings.voyage_rerank_timeout_seconds,
+                max_retries=settings.voyage_rerank_max_retries,
+            ),
+        )
+        graph = build_graph(nodes, MongoDBSaver(
+            client, db_name=settings.mongodb_db,
+            ttl=settings.checkpoint_retention_days * 86400,
+        ))
+        return AppRuntime(client=client, graph=graph, settings=settings)
+    except Exception:
+        client.close()
+        raise
+
+
+async def _get_runtime() -> AppRuntime:
+    global _RUNTIME
+    if _RUNTIME is None:
+        async with _RUNTIME_LOCK:
+            if _RUNTIME is None:
+                _RUNTIME = await cl.make_async(_build_runtime)(get_settings())
+    return _RUNTIME
+
+
+def _close_runtime() -> None:
+    if _RUNTIME is not None:
+        _RUNTIME.client.close()
+
+
+atexit.register(_close_runtime)
+
+
+def should_stream_draft(app_env: str) -> bool:
+    return app_env != "production"
+
+
+async def _initialize_session() -> None:
+    runtime = await _get_runtime()
+    settings = runtime.settings
+    user = cl.user_session.get("user")
+    access = resolve_access_context(
+        settings,
+        identifier=getattr(user, "identifier", None),
+        metadata=getattr(user, "metadata", None),
     )
-    nodes = AgentNodes(
-        db, chat, settings.source_top_k, settings.memory_top_k,
-        settings.memory_retention_days, settings.memory_max_per_user,
-        reconciliation_weights=settings.reconciliation_weights,
-        reranker=create_voyage_reranker(
-            api_key=settings.voyage_api_key,
-            model=settings.voyage_rerank_model,
-            timeout_seconds=settings.voyage_rerank_timeout_seconds,
-            max_retries=settings.voyage_rerank_max_retries,
-        ),
-    )
-    graph = build_graph(nodes, MongoDBSaver(
-        client, db_name=settings.mongodb_db,
-        ttl=settings.checkpoint_retention_days * 86400,
-    ))
-    cl.user_session.set("mongo_client", client)
-    cl.user_session.set("graph", graph)
+    cl.user_session.set("graph", runtime.graph)
     cl.user_session.set("thread_id", str(uuid4()))
     cl.user_session.set("settings", settings)
     cl.user_session.set("access_context", access)
@@ -118,13 +161,6 @@ async def on_chat_start() -> None:
         await cl.Message(
             content="Unable to initialize Atlas or Grove. Check the local configuration and restart."
         ).send()
-
-
-@cl.on_chat_end
-async def on_chat_end() -> None:
-    client = cl.user_session.get("mongo_client")
-    if client:
-        client.close()
 
 
 async def _show_update(node: str, payload: dict) -> None:
@@ -173,14 +209,17 @@ async def on_message(message: cl.Message) -> None:
     }
     try:
         first_token = True
+        show_draft_tokens = should_stream_draft(settings.app_env)
         async for mode, chunk in graph.astream(
             graph_input, config=config, stream_mode=["updates", "custom"]
         ):
             if mode == "custom":
                 if chunk.get("event") != "answer_token":
                     continue
+                if not show_draft_tokens:
+                    continue
                 if first_token:
-                    status.content = ""
+                    status.content = "Draft answer — citations are verified when complete.\n\n"
                     await status.update()
                     first_token = False
                 await status.stream_token(chunk["token"])

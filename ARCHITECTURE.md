@@ -66,16 +66,19 @@ flowchart LR
    authority and lifecycle status can refine source defaults. Voyage relevance is the semantic
    component when available; Atlas vector similarity is the fallback.
 6. **Grounded generation:** Azure Grove writes the response after reconciliation.
-   Citation binding accepts only artifacts present in the retrieved evidence set.
+   Model-supplied citation URLs are removed; binding accepts only artifacts present in the
+   retrieved evidence set. Production buffers draft tokens until this verification completes.
 7. **State and operations:** MongoDB stores artifacts, source policy, semantic memory,
-   and LangGraph checkpoints. TTL indexes enforce retention, while structured logs expose
-   correlation identifiers and degraded capabilities.
+   and LangGraph checkpoints. Chainlit sessions share one process-level MongoDB client and
+   graph runtime. TTL and unique memory indexes enforce lifecycle and identity, while structured
+   logs expose correlation identifiers and degraded capabilities.
 
 ## Retrieval and ranking sequence
 
 1. Atlas Automated Embedding uses `voyage-4` to maintain document vectors.
 2. Each source agent executes Atlas Vector Search with `realm_id` and
-   `access_principals` pre-filters, then adds permission-scoped contradiction probes.
+   `access_principals` pre-filters, then scans a bounded window for one permission-scoped
+   representative of each of up to three alternate claim values.
 3. Voyage `rerank-2.5` globally scores every retrieved candidate; `top_k=None` preserves
    all evidence needed for contradiction analysis.
 4. The truth score combines 55% semantic relevance, 30% source authority, and 15%
@@ -98,6 +101,8 @@ flowchart LR
 - **Deterministic scoring:** Conflict resolution remains explainable, configurable, and testable.
 - **LLM after retrieval:** Grove generates grounded prose but does not establish authority.
 - **Verified citations:** References are bound to actual retrieved documents.
+- **Convergent index bootstrap:** Existing autoEmbed definitions are normalized and compared;
+  compatible drift updates in place, while incompatible index types fail explicitly.
 - **Defense-in-depth authorization:** Tenant and ACL constraints execute inside Atlas retrieval.
 - **Graceful degradation:** Failed sources are reported without creating an ungrounded answer.
 - **Replaceable connectors:** APIs or MCP servers can replace synthetic source adapters while
@@ -160,7 +165,8 @@ authorized recall, while Voyage improves semantic precision before governed reco
 
 MongoDB durably stores LangGraph checkpoints and user-scoped semantic memory beside source
 evidence. TTL indexes, tombstones, deduplication, and bounded retention provide lifecycle
-controls without introducing another persistence system.
+controls without introducing another persistence system. A unique partial `memory_id` index
+protects deterministic upserts from concurrent duplication.
 
 ### Explainable reconciliation
 
@@ -184,10 +190,14 @@ visible in the evidence inspector for auditability.
 - The PHI policy case selects the effective SharePoint policy over a historical Teams incident
   suggestion, grounds both representatives, and produces four verified source entries.
 - Generic `[source:artifact_id]` output is deterministically rebound to the verified artifact's
-  actual source; the live PHI answer contains no unresolved citation markers.
+  actual source. Model-supplied markdown URLs are removed before rebinding.
 - All **4/4 live RAG evaluation cases pass**, including canonical winner, representative,
   stale-evidence, terminology, citation-precision, source-concision, and latency checks.
-- The default test profile reports **60 passed and four credential-gated live tests skipped**;
+- All **4/4 assurance retrieval cases pass** for key rotation, dead-letter replay, cache
+  invalidation, and break-glass logging.
+- A 15-operation, five-worker Atlas retrieval smoke completed with zero errors and no content
+  logging; this is a bounded smoke, not a production capacity benchmark.
+- The default test profile reports **81 passed and four credential-gated live tests skipped**;
   Ruff, mypy, dependency validation, and IDE diagnostics pass.
 - Atlas vector-score fallback is covered by deterministic failure-path tests.
 

@@ -1,0 +1,26 @@
+[
+  {
+    "id": "rx-key-rotation",
+    "query": "How do JWKS caching, overlapping signing-key rotation, and unknown-key refresh work?",
+    "theme": "rx_partner_auth",
+    "assurance_dimension": "key-rotation"
+  },
+  {
+    "id": "pa-dead-letter-replay",
+    "query": "How are failed prior authorization events dead-lettered and safely replayed?",
+    "theme": "pa_status_delivery",
+    "assurance_dimension": "dead-letter"
+  },
+  {
+    "id": "eligibility-invalidation",
+    "query": "How do coverage changes invalidate eligibility cache entries before TTL expiry?",
+    "theme": "eligibility_cache",
+    "assurance_dimension": "invalidation"
+  },
+  {
+    "id": "phi-break-glass",
+    "query": "Does incident urgency permit break-glass raw PHI logging?",
+    "theme": "phi_logging",
+    "assurance_dimension": "break-glass"
+  }
+]

@@ -53,7 +53,7 @@ def main() -> None:
                 ttl=settings.checkpoint_retention_days * 86400,
             )
             print(f"Seeded {result['artifacts']} artifacts: {result['per_source']}")
-            print("Requested 5 source autoEmbed indexes and 1 semantic-memory index.")
+            print(f"Search index actions: {result['search_index_actions']}")
             if args.wait:
                 print(f"Index status: {wait_for_indexes(db)}")
             return

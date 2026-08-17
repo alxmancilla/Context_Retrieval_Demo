@@ -33,6 +33,7 @@ deterministic reconciliation → Grove grounded writer → memory`
 
 See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the complete component diagram, retrieval
 sequence, MongoDB/Voyage rationale, resilience paths, and validation status.
+See [`SECURITY.md`](SECURITY.md) for provider data flows and production release gates.
 
 ## Contradiction behavior
 
@@ -94,8 +95,9 @@ Start the Chainlit interface with:
 Open `http://127.0.0.1:8000`. Each chat receives a MongoDB-checkpointed thread and
 shows coordinator routing, parallel source-agent retrieval, truthiness scoring,
 contradictions, citations, degraded capabilities, and semantic memory in expandable
-steps and side-panel inspectors. Grove answer tokens stream through LangGraph's custom
-event channel; the application then binds verified source links to the completed answer.
+steps and side-panel inspectors. In local mode, Grove tokens stream through LangGraph's custom
+event channel under an explicit unverified-draft label; production buffers them until the
+application binds verified source links to the completed answer.
 
 The default connection timeouts are tuned for this low-concurrency demo: Atlas server
 selection fails after 5 seconds, connection establishment after 10 seconds, and an
@@ -185,14 +187,20 @@ policy case requires the effective SharePoint policy to win, the historical Team
 to remain grounded, and no more than six appendix artifacts. This is a transparent regression
 proxy, not a substitute for expert review or a calibrated faithfulness judge.
 
-Current validated baseline: **60 unit/default-profile tests pass**, four credential-gated live
-tests skip by default, and **4/4 live RAG evaluation cases pass**.
+Run `.venv/bin/python -m evals.retrieval_runner` for four additional assurance-control
+retrieval checks covering JWKS rotation, PA dead-letter replay, eligibility invalidation, and
+break-glass PHI logging. Run `.venv/bin/python -m scripts.load_retrieval --rounds 3 --workers 5`
+for a bounded, metric-only concurrent Atlas retrieval smoke; it prints no document content.
+
+Current validated baseline: **81 unit/default-profile tests pass**, four credential-gated live
+tests skip by default, **4/4 live RAG cases pass**, and **4/4 assurance retrieval cases pass**.
 
 ## Security note
 
 This is a demo. Production requires source-level authorization propagation,
 permission-aware retrieval, audit retention, secret management, PII controls,
-and evaluation gates. Never commit `.env`.
+and evaluation gates. Never commit `.env`; do not introduce real PHI until every gate in
+[`SECURITY.md`](SECURITY.md) is satisfied.
 
 Source retrieval now enforces both `realm_id` and an indexed intersection with each
 artifact's `access_principals`. Local mode uses `ACCESS_PRINCIPALS`; set
@@ -203,7 +211,9 @@ claims to `realm_id`, `user_id`, and principals before external deployment.
 
 Chainlit defaults to localhost-only origins, disabled uploads, a 30-minute connection
 session, and 24-hour user-session expiry. `APP_ENV=production` refuses to start while
-authentication is disabled. For deployment, replace the localhost origins with the
+authentication is disabled, buffers unverified draft tokens, and requires HTTPS for Grove.
+Password-mode signing secrets must be non-placeholder values of at least 32 characters.
+For deployment, replace the localhost origins with the
 exact HTTPS application origin and integrate enterprise OAuth/OIDC before exposure.
 
 Application degradation is emitted as structured JSON with event, correlation ID,
@@ -213,7 +223,9 @@ credentials, and raw exception text are excluded. Configure `LOG_LEVEL`,
 `VOYAGE_RERANK_MAX_RETRIES` for the deployment environment.
 
 Semantic memories are redacted, content-deduplicated, capped per user, excluded when
-tombstoned or expired, and removed by a TTL index after `MEMORY_RETENTION_DAYS`.
+tombstoned or expired, protected by a unique identity index, and removed by a TTL index after
+`MEMORY_RETENTION_DAYS`. Chainlit reuses one process-level MongoDB client instead of creating
+a connection pool per chat session.
 LangGraph checkpoints use `CHECKPOINT_RETENTION_DAYS`. To exercise the confirmed
 deletion path, run `.venv/bin/python app.py forget --confirm`; use `--user-id` only as
 an authorized realm administrator.

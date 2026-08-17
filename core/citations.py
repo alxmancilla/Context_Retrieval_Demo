@@ -1,6 +1,7 @@
 import re
 
 MAX_SOURCE_APPENDIX_ARTIFACTS = 6
+SOURCE_LABEL = r"github|confluence|jira|sharepoint|teams"
 
 
 def bind_source_links(answer: str, hits: list[dict], contradictions: list[dict]) -> str:
@@ -8,6 +9,19 @@ def bind_source_links(answer: str, hits: list[dict], contradictions: list[dict])
     by_id = {hit["artifact_id"]: hit for hit in hits}
     base = re.split(r"\n#{2,4}\s+Sources\s*\n", answer, maxsplit=1,
                     flags=re.IGNORECASE)[0].rstrip()
+    base = re.sub(
+        rf"\[((?:{SOURCE_LABEL})|source):([^\]\n]+)\]"
+        r"\((?:[^()\n]|\([^()\n]*\))*\)",
+        lambda match: f"[{match.group(1)}:{match.group(2)}]",
+        base,
+        flags=re.IGNORECASE,
+    )
+    base = re.sub(
+        rf"\[({SOURCE_LABEL})\]\((?:[^()\n]|\([^()\n]*\))*\)",
+        lambda match: f"[{match.group(1)}]",
+        base,
+        flags=re.IGNORECASE,
+    )
     cited_ids: list[str] = []
 
     def bind_exact(match: re.Match) -> str:
@@ -19,7 +33,7 @@ def bind_source_links(answer: str, hits: list[dict], contradictions: list[dict])
         return f"[{source}:{artifact_id}]({hit['url']})"
 
     base = re.sub(
-        r"\[(github|confluence|jira|sharepoint|teams):([^\]\n]+)\](?!\()",
+        rf"\[({SOURCE_LABEL}):([^\]\n]+)\](?!\()",
         bind_exact, base, flags=re.IGNORECASE,
     )
 
@@ -48,7 +62,7 @@ def bind_source_links(answer: str, hits: list[dict], contradictions: list[dict])
         return f"[{source}:{hit['artifact_id']}]({hit['url']})"
 
     base = re.sub(
-        r"\[(github|confluence|jira|sharepoint|teams)\](?!\()",
+        rf"\[({SOURCE_LABEL})\](?!\()",
         bind_source_only, base, flags=re.IGNORECASE,
     )
     generic_hits = [hit for hit in hits if hit["artifact_id"] not in cited_ids] or hits

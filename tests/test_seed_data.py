@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 
 from core.reconciliation import reconcile
 from data.seed_data import all_artifacts
+from scripts.check_acl import expected_acl_documents
 
 
 def test_seed_has_five_islands_and_planted_conflicts():
@@ -29,6 +30,10 @@ def test_seed_has_five_islands_and_planted_conflicts():
     assert all("role:platform-engineer" in row["access_principals"] for row in rows)
     assert all(len(row["access_principals"]) == 2 for row in rows)
     assert len({row["artifact_id"] for row in rows}) == 800
+
+
+def test_acl_diagnostic_expected_github_count_tracks_seed_data():
+    assert expected_acl_documents("test-realm") == 160
 
 
 def test_assurance_expansion_is_balanced_relevant_and_governed():
