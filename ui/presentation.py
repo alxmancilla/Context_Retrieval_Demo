@@ -6,6 +6,41 @@ SOURCE_LABELS = {
 }
 
 
+def solution_architecture_markdown() -> str:
+    return """
+## Solution architecture
+
+```mermaid
+flowchart LR
+    U[User] --> UI[Chainlit UI]
+    UI --> AUTH[Fail-closed identity\nrealm + user + principals]
+    AUTH --> LG[LangGraph coordinator]
+    LG --> INT[Intent parsing]
+    INT --> MEM[Recent context +\ngoverned memory]
+    INT --> SRC[Parallel source agents]
+    SRC --> HS[Atlas hybrid search\nvector + lexical + ACL]
+    HS --> RR[Voyage rerank]
+    RR --> REC[Deterministic reconciliation\nauthority + freshness + claims]
+    REC --> GEN[Grove grounded answer]
+    GEN --> CIT[Verified citation binding]
+    CIT --> UI
+    MEM --> GEN
+    LG --> CKPT[(MongoDB checkpoints)]
+    MEM --> M[(MongoDB memory nodes)]
+    HS --> A[(Atlas source, governance,\nand claim collections)]
+```
+
+### Implementation map
+
+- **State:** LangGraph checkpoints store execution state and recent turns.
+- **Memory:** governed memory nodes store only selected preferences, decisions, and task context.
+- **Retrieval:** source agents run ACL-filtered Atlas Vector Search + lexical Search, fused before reranking.
+- **Truth:** protected governance and indexed claims drive authority, lifecycle, and contradictions.
+- **Security:** missing identity scope fails closed; retrieval filters apply before ranking.
+- **Operations:** `/ready` verifies MongoDB, all 11 indexes, pool counters, memory metrics, and versions.
+""".strip()
+
+
 def intent_markdown(intent: dict) -> str:
     sources = ", ".join(SOURCE_LABELS.get(item, item) for item in intent.get("sources", []))
     entities = json.dumps(intent.get("entities", {}), indent=2)
@@ -89,6 +124,10 @@ def memories_markdown(memories: list[dict]) -> str:
         return "No relevant long-term memory was used for this turn."
     sections = ["Memory is user-scoped conversational context, not factual authority."]
     for index, memory in enumerate(memories[:3], 1):
-        content = str(memory.get("content", ""))[:900]
-        sections.append(f"### Memory {index}\n\n{content}")
+        content = str(memory.get("summary") or memory.get("content", ""))[:900]
+        memory_type = memory.get("memory_type", "legacy_context")
+        importance = float(memory.get("importance", 0.0))
+        sections.append(
+            f"### Memory {index}: {memory_type} ({importance:.2f})\n\n{content}"
+        )
     return "\n\n".join(sections)

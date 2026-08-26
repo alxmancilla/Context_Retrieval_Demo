@@ -24,6 +24,9 @@ async def main() -> None:
         server_selection_timeout_ms=settings.mongodb_server_selection_timeout_ms,
         connect_timeout_ms=settings.mongodb_connect_timeout_ms,
         socket_timeout_ms=settings.mongodb_socket_timeout_ms,
+        max_pool_size=settings.mongodb_max_pool_size,
+        min_pool_size=settings.mongodb_min_pool_size,
+        wait_queue_timeout_ms=settings.mongodb_wait_queue_timeout_ms,
     )
     try:
         chat = GroveChatProvider(
@@ -37,6 +40,14 @@ async def main() -> None:
             AgentNodes(
                 db, chat, settings.source_top_k, settings.memory_top_k,
                 settings.memory_retention_days, settings.memory_max_per_user,
+                memory_min_importance=settings.memory_min_importance,
+                memory_similarity_threshold=settings.memory_similarity_threshold,
+                memory_embedding_profile=settings.memory_embedding_profile,
+                prompt_version=settings.prompt_version,
+                agent_version=settings.agent_version,
+                recent_context_messages=settings.recent_context_messages,
+                recent_context_max_chars=settings.recent_context_max_chars,
+                conversation_summary_max_chars=settings.conversation_summary_max_chars,
                 reconciliation_weights=settings.reconciliation_weights,
                 reranker=create_voyage_reranker(
                     api_key=settings.voyage_api_key,

@@ -1,6 +1,7 @@
 """Validate retention indexes and migration metadata without reading content."""
 
 from core.memory import MEMORY_VECTOR_INDEX
+from core.schemas import THREAD_OWNERSHIP_COLLECTION
 from core.settings import get_settings
 from db.bootstrap import connect
 
@@ -21,6 +22,9 @@ def main() -> None:
         server_selection_timeout_ms=settings.mongodb_server_selection_timeout_ms,
         connect_timeout_ms=settings.mongodb_connect_timeout_ms,
         socket_timeout_ms=settings.mongodb_socket_timeout_ms,
+        max_pool_size=settings.mongodb_max_pool_size,
+        min_pool_size=settings.mongodb_min_pool_size,
+        wait_queue_timeout_ms=settings.mongodb_wait_queue_timeout_ms,
     )
     try:
         expected_checkpoint_ttl = settings.checkpoint_retention_days * 86400
@@ -29,7 +33,11 @@ def main() -> None:
         memory_ttl = _ttl_indexes(db.memories)
         checkpoint_ttl = _ttl_indexes(db.checkpoints)
         writes_ttl = _ttl_indexes(db.checkpoint_writes)
+        thread_ttl = _ttl_indexes(db[THREAD_OWNERSHIP_COLLECTION])
         missing_memory_expiry = db.memories.count_documents({"expires_at": {"$exists": False}})
+        missing_memory_validity = db.memories.count_documents({"$or": [
+            {"valid_from": {"$exists": False}}, {"valid_until": {"$exists": False}},
+        ]})
         missing_checkpoint_time = sum(
             db[name].count_documents({"created_at": {"$exists": False}})
             for name in ("checkpoints", "checkpoint_writes")
@@ -38,14 +46,18 @@ def main() -> None:
         print("memory_ttl=", memory_ttl)
         print("checkpoint_ttl=", checkpoint_ttl)
         print("checkpoint_writes_ttl=", writes_ttl)
+        print("thread_ownership_ttl=", thread_ttl)
         print("missing_memory_expiry=", missing_memory_expiry)
+        print("missing_memory_validity=", missing_memory_validity)
         print("missing_checkpoint_created_at=", missing_checkpoint_time)
         valid = (
             memory_status == "READY"
             and any(seconds == 0 for _, seconds in memory_ttl)
             and any(seconds == expected_checkpoint_ttl for _, seconds in checkpoint_ttl)
             and any(seconds == expected_checkpoint_ttl for _, seconds in writes_ttl)
+            and any(seconds == 0 for _, seconds in thread_ttl)
             and missing_memory_expiry == 0
+            and missing_memory_validity == 0
             and missing_checkpoint_time == 0
         )
         if not valid:

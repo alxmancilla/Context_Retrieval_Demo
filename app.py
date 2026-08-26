@@ -11,6 +11,7 @@ from core.observability import configure_logging
 from core.providers.chat import GroveChatProvider
 from core.providers.rerank import create_voyage_reranker
 from core.settings import get_settings
+from core.threads import register_thread, scoped_thread_id
 from db.bootstrap import bootstrap, connect, wait_for_indexes
 
 
@@ -40,6 +41,9 @@ def main() -> None:
         server_selection_timeout_ms=settings.mongodb_server_selection_timeout_ms,
         connect_timeout_ms=settings.mongodb_connect_timeout_ms,
         socket_timeout_ms=settings.mongodb_socket_timeout_ms,
+        max_pool_size=settings.mongodb_max_pool_size,
+        min_pool_size=settings.mongodb_min_pool_size,
+        wait_queue_timeout_ms=settings.mongodb_wait_queue_timeout_ms,
     )
     try:
         if args.command == "bootstrap":
@@ -47,6 +51,10 @@ def main() -> None:
                 db, settings.realm_id,
                 memory_retention_days=settings.memory_retention_days,
                 checkpoint_retention_days=settings.checkpoint_retention_days,
+                validation_action=settings.mongodb_validation_action,
+                memory_embedding_profile=settings.memory_embedding_profile,
+                prompt_version=settings.prompt_version,
+                agent_version=settings.agent_version,
             )
             MongoDBSaver(
                 client, db_name=settings.mongodb_db,
@@ -70,6 +78,14 @@ def main() -> None:
         nodes = AgentNodes(
             db, chat, settings.source_top_k, settings.memory_top_k,
             settings.memory_retention_days, settings.memory_max_per_user,
+            memory_min_importance=settings.memory_min_importance,
+            memory_similarity_threshold=settings.memory_similarity_threshold,
+            memory_embedding_profile=settings.memory_embedding_profile,
+            prompt_version=settings.prompt_version,
+            agent_version=settings.agent_version,
+            recent_context_messages=settings.recent_context_messages,
+            recent_context_max_chars=settings.recent_context_max_chars,
+            conversation_summary_max_chars=settings.conversation_summary_max_chars,
             reconciliation_weights=settings.reconciliation_weights,
             reranker=create_voyage_reranker(
                 api_key=settings.voyage_api_key,
@@ -84,12 +100,17 @@ def main() -> None:
         )
         graph = build_graph(nodes, saver)
         correlation_id = str(uuid4())
+        thread_id = scoped_thread_id(settings.realm_id, settings.user_id, args.thread_id)
+        register_thread(
+            db, thread_id, settings.realm_id, settings.user_id,
+            settings.checkpoint_retention_days,
+        )
         result = graph.invoke({
             "query": args.question, "messages": [HumanMessage(content=args.question)],
             "realm_id": settings.realm_id, "user_id": settings.user_id,
             "access_principals": list(settings.access_principals),
             "correlation_id": correlation_id,
-        }, config={"configurable": {"thread_id": args.thread_id}})
+        }, config={"configurable": {"thread_id": thread_id}})
         print(result["answer"])
         if result.get("degraded"):
             print(f"\n[degraded: {', '.join(result['degraded'])}]")

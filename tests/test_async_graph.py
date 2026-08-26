@@ -6,6 +6,9 @@ from agent.graph import build_graph
 
 
 class FakeAsyncNodes:
+    def validate_access(self, state):
+        return {}
+
     def parse_intent(self, state):
         sources = ["github"] if "github only" in state["query"] else ["github", "jira"]
         return {
@@ -30,6 +33,9 @@ class FakeAsyncNodes:
     def save_memory(self, state):
         return {}
 
+    def compact_conversation(self, state):
+        return {"conversation_summary": ""}
+
 
 def test_async_ui_graph_path_and_multi_turn_source_reset():
     async def scenario():
@@ -38,14 +44,15 @@ def test_async_ui_graph_path_and_multi_turn_source_reset():
         seen = []
         initial = {
             "query": "search broadly", "realm_id": "r", "user_id": "u",
-            "correlation_id": "first",
+            "access_principals": ["role:test"], "correlation_id": "first",
         }
         async for update in graph.astream(initial, config=config, stream_mode="updates"):
             seen.extend(update)
         first = (await graph.aget_state(config)).values
         assert set(first["source_results"]) == {"github", "jira"}
-        assert {"parse_intent", "retrieve_memory", "retrieve_source", "reconcile",
+        assert {"validate_access", "parse_intent", "retrieve_memory", "retrieve_source", "reconcile",
                 "generate", "save_memory"} <= set(seen)
+        assert "compact_conversation" in seen
 
         second = {**initial, "query": "github only", "correlation_id": "second"}
         async for _ in graph.astream(second, config=config, stream_mode="updates"):

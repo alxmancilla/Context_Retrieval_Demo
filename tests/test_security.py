@@ -2,7 +2,12 @@ from types import SimpleNamespace
 
 import pytest
 
-from core.security import credentials_match, resolve_access_context
+from core.security import (
+    credentials_match,
+    resolve_access_context,
+    resolve_oauth_access_context,
+    validate_agent_scope,
+)
 from core.settings import configured_app_env, configured_auth_mode, get_settings
 
 
@@ -41,6 +46,31 @@ def test_access_context_rejects_non_string_or_operator_principals():
         resolve_access_context(_settings(), metadata={"principals": [{"$ne": None}]})
 
 
+def test_agent_scope_fails_closed_without_principals():
+    with pytest.raises(ValueError, match="required"):
+        validate_agent_scope("realm", "user", None)
+
+
+def test_production_identity_requires_trusted_claims():
+    with pytest.raises(ValueError, match="Production identity"):
+        resolve_access_context(_settings(app_env="production"), identifier="alice", metadata={})
+
+
+def test_oauth_context_requires_allowed_provider_and_maps_groups():
+    settings = _settings(
+        oauth_allowed_providers=("azure-ad",), oauth_realm_claim="tenant",
+        oauth_principals_claim="groups", oauth_group_prefix="group:",
+    )
+    access = resolve_oauth_access_context(
+        settings, "azure-ad", "alice", {"tenant": "realm-a", "groups": ["security"]}
+    )
+    assert access.principals == ("group:security", "user:alice")
+    with pytest.raises(ValueError, match="not allowed"):
+        resolve_oauth_access_context(
+            settings, "github", "alice", {"tenant": "realm-a", "groups": []}
+        )
+
+
 def test_password_credentials_are_compared_only_in_password_mode():
     password_settings = _settings(
         auth_mode="password", auth_username="alice", auth_password="correct-horse"
@@ -54,7 +84,7 @@ def test_runtime_profile_rejects_disabled_auth_in_production(monkeypatch):
     monkeypatch.setenv("APP_ENV", "production")
     monkeypatch.setenv("AUTH_MODE", "disabled")
     get_settings.cache_clear()
-    with pytest.raises(ValueError, match="AUTH_MODE must be enabled"):
+    with pytest.raises(ValueError, match="AUTH_MODE must be 'oauth'"):
         get_settings()
     get_settings.cache_clear()
 
@@ -85,9 +115,16 @@ def test_password_mode_rejects_weak_chainlit_signing_secret(monkeypatch):
     [
         ("SOURCE_TOP_K", "0"),
         ("MEMORY_TOP_K", "21"),
+        ("MEMORY_MIN_IMPORTANCE", "1.1"),
+        ("MEMORY_SIMILARITY_THRESHOLD", "0.49"),
+        ("RECENT_CONTEXT_MESSAGES", "1"),
+        ("RECENT_CONTEXT_MAX_CHARS", "499"),
+        ("CONVERSATION_SUMMARY_MAX_CHARS", "10001"),
         ("MONGODB_SERVER_SELECTION_TIMEOUT_MS", "0"),
         ("MONGODB_CONNECT_TIMEOUT_MS", "120001"),
         ("MONGODB_SOCKET_TIMEOUT_MS", "999"),
+        ("MONGODB_MAX_POOL_SIZE", "0"),
+        ("MONGODB_WAIT_QUEUE_TIMEOUT_MS", "99"),
     ],
 )
 def test_runtime_rejects_unbounded_retrieval_and_timeout_values(monkeypatch, name, value):
@@ -100,12 +137,28 @@ def test_runtime_rejects_unbounded_retrieval_and_timeout_values(monkeypatch, nam
 
 def test_production_rejects_non_https_grove_endpoint(monkeypatch):
     monkeypatch.setenv("APP_ENV", "production")
-    monkeypatch.setenv("AUTH_MODE", "password")
+    monkeypatch.setenv("AUTH_MODE", "oauth")
     monkeypatch.setenv("CHAINLIT_AUTH_SECRET", "a-secure-random-signing-secret-value")
-    monkeypatch.setenv("AUTH_USERNAME", "alice")
-    monkeypatch.setenv("AUTH_PASSWORD", "correct-horse")
+    monkeypatch.setenv("OAUTH_ALLOWED_PROVIDERS", "azure-ad")
     monkeypatch.setenv("GROVE_BASE_URL", "http://grove.example/v1")
     get_settings.cache_clear()
     with pytest.raises(ValueError, match="GROVE_BASE_URL must use HTTPS"):
+        get_settings()
+    get_settings.cache_clear()
+
+
+def test_pool_minimum_cannot_exceed_maximum(monkeypatch):
+    monkeypatch.setenv("MONGODB_MIN_POOL_SIZE", "20")
+    monkeypatch.setenv("MONGODB_MAX_POOL_SIZE", "10")
+    get_settings.cache_clear()
+    with pytest.raises(ValueError, match="MIN_POOL_SIZE"):
+        get_settings()
+    get_settings.cache_clear()
+
+
+def test_validation_action_is_strictly_validated(monkeypatch):
+    monkeypatch.setenv("MONGODB_VALIDATION_ACTION", "ignore")
+    get_settings.cache_clear()
+    with pytest.raises(ValueError, match="VALIDATION_ACTION"):
         get_settings()
     get_settings.cache_clear()

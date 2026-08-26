@@ -10,3 +10,14 @@ historical suggestions from effective policy, and reports the score margin.
 Every factual citation is bound to a retrieved artifact. Expand **Agent activity** and the
 side-panel inspectors to compare Atlas vector and Voyage rerank scores, evidence governance,
 contradiction representatives, lifecycle status, and the final deterministic decision.
+
+Embeddings are managed by Atlas Automated Embedding indexes over the `content` field, so you will
+not see `embedding` arrays in the collections. Source retrieval combines Atlas Vector Search,
+lexical Search, ACL filters, and `$rankFusion`; Voyage reranks only authorized candidates.
+
+## Visual architecture
+
+[![Open the solution architecture diagram](/public/solution-architecture.png)](/public/solution-architecture.png)
+
+Use the preview above, or the **Architecture** link in the header, to open the visual design
+diagram only when you want it.

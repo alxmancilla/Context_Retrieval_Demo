@@ -5,17 +5,22 @@ from typing import Any, cast
 from uuid import uuid4
 
 import chainlit as cl
+from chainlit.server import app as chainlit_server
+from fastapi import Request
+from fastapi.responses import JSONResponse
 from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.mongodb import MongoDBSaver
 
 from agent.graph import build_graph
 from agent.nodes import AgentNodes
 from core.observability import configure_logging, get_logger, log_failure
+from core.pool_metrics import PoolMetrics
 from core.providers.chat import GroveChatProvider
 from core.providers.rerank import create_voyage_reranker
-from core.security import credentials_match, resolve_access_context
+from core.security import credentials_match, resolve_access_context, resolve_oauth_access_context
 from core.settings import Settings, configured_auth_mode, get_settings
-from db.bootstrap import connect
+from core.threads import register_thread, scoped_thread_id
+from db.bootstrap import connect, search_index_statuses
 from ui.presentation import (
     contradictions_markdown,
     evidence_markdown,
@@ -30,8 +35,11 @@ LOGGER = get_logger("chainlit")
 @dataclass(frozen=True)
 class AppRuntime:
     client: Any
+    database: Any
     graph: Any
     settings: Settings
+    pool_metrics: PoolMetrics
+    memory_metrics: Any
 
 
 _RUNTIME: AppRuntime | None = None
@@ -70,6 +78,28 @@ if configured_auth_mode() == "password":
         )
 
 
+if configured_auth_mode() == "oauth":
+    @cl.oauth_callback
+    async def authenticate_oauth(
+        provider_id: str, _token: str, raw_user_data: dict[str, str],
+        default_user: cl.User, _id_token: str | None,
+    ) -> cl.User | None:
+        settings = get_settings()
+        try:
+            access = resolve_oauth_access_context(
+                settings, provider_id, default_user.identifier, raw_user_data
+            )
+        except ValueError:
+            return None
+        return cl.User(
+            identifier=access.user_id,
+            metadata={
+                "realm_id": access.realm_id, "user_id": access.user_id,
+                "principals": list(access.principals),
+            },
+        )
+
+
 @cl.set_starters
 async def starters(_user: cl.User | None) -> list[cl.Starter]:
     return [cl.Starter(label=label, message=message) for label, message in STARTER_PROMPTS]
@@ -77,12 +107,17 @@ async def starters(_user: cl.User | None) -> list[cl.Starter]:
 
 def _build_runtime(settings: Settings) -> AppRuntime:
     configure_logging(settings.log_level)
+    pool_metrics = PoolMetrics()
     client, db = connect(
         settings.mongodb_uri,
         settings.mongodb_db,
         server_selection_timeout_ms=settings.mongodb_server_selection_timeout_ms,
         connect_timeout_ms=settings.mongodb_connect_timeout_ms,
         socket_timeout_ms=settings.mongodb_socket_timeout_ms,
+        max_pool_size=settings.mongodb_max_pool_size,
+        min_pool_size=settings.mongodb_min_pool_size,
+        wait_queue_timeout_ms=settings.mongodb_wait_queue_timeout_ms,
+        pool_metrics=pool_metrics,
     )
     try:
         chat = GroveChatProvider(
@@ -95,6 +130,14 @@ def _build_runtime(settings: Settings) -> AppRuntime:
         nodes = AgentNodes(
             db, chat, settings.source_top_k, settings.memory_top_k,
             settings.memory_retention_days, settings.memory_max_per_user,
+            memory_min_importance=settings.memory_min_importance,
+            memory_similarity_threshold=settings.memory_similarity_threshold,
+            memory_embedding_profile=settings.memory_embedding_profile,
+            prompt_version=settings.prompt_version,
+            agent_version=settings.agent_version,
+            recent_context_messages=settings.recent_context_messages,
+            recent_context_max_chars=settings.recent_context_max_chars,
+            conversation_summary_max_chars=settings.conversation_summary_max_chars,
             reconciliation_weights=settings.reconciliation_weights,
             reranker=create_voyage_reranker(
                 api_key=settings.voyage_api_key,
@@ -107,7 +150,10 @@ def _build_runtime(settings: Settings) -> AppRuntime:
             client, db_name=settings.mongodb_db,
             ttl=settings.checkpoint_retention_days * 86400,
         ))
-        return AppRuntime(client=client, graph=graph, settings=settings)
+        return AppRuntime(
+            client=client, database=db, graph=graph, settings=settings,
+            pool_metrics=pool_metrics, memory_metrics=nodes.memory.metrics,
+        )
     except Exception:
         client.close()
         raise
@@ -130,6 +176,56 @@ def _close_runtime() -> None:
 atexit.register(_close_runtime)
 
 
+def _readiness_snapshot(runtime: AppRuntime) -> dict:
+    runtime.client.admin.command("ping")
+    indexes = search_index_statuses(runtime.database)
+    ready = len(indexes) == 11 and all(status == "READY" for status in indexes.values())
+    return {
+        "status": "ready" if ready else "not_ready",
+        "mongodb": "reachable",
+        "search_indexes_ready": sum(status == "READY" for status in indexes.values()),
+        "search_indexes_expected": 11,
+        "pool": runtime.pool_metrics.snapshot(),
+        "memory": runtime.memory_metrics.snapshot(),
+        "versions": {
+            "agent": getattr(runtime.settings, "agent_version", "unknown"),
+            "prompt": getattr(runtime.settings, "prompt_version", "unknown"),
+            "memory_embedding": getattr(
+                runtime.settings, "memory_embedding_profile", "unknown",
+            ),
+        },
+    }
+
+
+@chainlit_server.get("/ready", include_in_schema=False)
+async def readiness() -> JSONResponse:
+    try:
+        runtime = await _get_runtime()
+        snapshot = await cl.make_async(_readiness_snapshot)(runtime)
+    except Exception as exc:
+        log_failure(
+            LOGGER, "readiness_failed", exc, correlation_id=None, node="readiness"
+        )
+        return JSONResponse(
+            status_code=503,
+            content={"status": "not_ready", "reason": type(exc).__name__},
+        )
+    return JSONResponse(
+        status_code=200 if snapshot["status"] == "ready" else 503,
+        content=snapshot,
+    )
+
+
+@chainlit_server.middleware("http")
+async def operational_probe(request: Request, call_next: Any) -> Any:
+    """Serve probes before Chainlit's SPA catch-all route can consume them."""
+    if request.url.path == "/health":
+        return JSONResponse(content={"status": "healthy"})
+    if request.url.path == "/ready":
+        return await readiness()
+    return await call_next(request)
+
+
 def should_stream_draft(app_env: str) -> bool:
     return app_env != "production"
 
@@ -144,7 +240,12 @@ async def _initialize_session() -> None:
         metadata=getattr(user, "metadata", None),
     )
     cl.user_session.set("graph", runtime.graph)
-    cl.user_session.set("thread_id", str(uuid4()))
+    thread_id = scoped_thread_id(access.realm_id, access.user_id, str(uuid4()))
+    await cl.make_async(register_thread)(
+        runtime.database, thread_id, access.realm_id, access.user_id,
+        settings.checkpoint_retention_days,
+    )
+    cl.user_session.set("thread_id", thread_id)
     cl.user_session.set("settings", settings)
     cl.user_session.set("access_context", access)
 

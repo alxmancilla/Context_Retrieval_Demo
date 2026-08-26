@@ -43,7 +43,7 @@ def select_answer_evidence(
 
 
 def answer_prompt(query: str, hits: list[dict], contradictions: list[dict],
-                  memories: list[dict]) -> str:
+                  memories: list[dict], recent_context: list[dict] | None = None) -> str:
     selected_hits = select_answer_evidence(hits, contradictions)
     evidence = [{
         "citation": f"[{hit['source']}:{hit['artifact_id']}]",
@@ -57,5 +57,6 @@ def answer_prompt(query: str, hits: list[dict], contradictions: list[dict],
         f"USER QUESTION:\n{query}\n\n"
         f"DETERMINISTIC CONTRADICTION DECISIONS:\n{json.dumps(contradictions, default=str)}\n\n"
         f"RANKED ENTERPRISE EVIDENCE:\n{json.dumps(evidence, default=str)}\n\n"
-        f"NON-AUTHORITATIVE USER MEMORY:\n{json.dumps(memory_text)}"
+        f"RECENT CONVERSATION (NON-AUTHORITATIVE):\n{json.dumps(recent_context or [])}\n\n"
+        f"DURABLE USER MEMORY (NON-AUTHORITATIVE):\n{json.dumps(memory_text)}"
     )

@@ -12,32 +12,41 @@ cited answer.
 - In-process, MCP-shaped source tools in Phase 1; their descriptors live in the
   `sources` registry so a real MCP transport can replace them later.
 - Atlas Automated Embedding indexes use Voyage `voyage-4`. Documents contain
-  business data and metadata; vectors are generated and managed inside the index.
+  business data and metadata; vectors are generated and managed inside Atlas Search indexes,
+  so source documents do **not** expose an `embedding` array field.
+- Each source combines ACL-filtered semantic and lexical retrieval with MongoDB
+  `$rankFusion`, improving recall for both concepts and exact identifiers.
 - Voyage `rerank-2.5` globally reranks ACL-filtered candidates before deterministic
   reconciliation. Atlas vector similarity remains the fallback if reranking is unavailable.
 - Source truth score defaults to 55% semantic relevance, 30% authority, and 15%
   freshness. The three validated `RECONCILIATION_*_WEIGHT` settings support calibrated
   profiles and must sum to `1.0`.
-- Contradictions are detected deterministically from normalized `claims` fields.
-- Artifact governance distinguishes policy, implementation, runbook, and historical incident
+- Contradictions are detected from ACL-scoped records in the indexed `claim_assertions` collection.
+- Protected artifact governance distinguishes policy, implementation, runbook, and historical incident
   evidence; contradiction decisions include representatives, lifecycle status, and score margin.
 - MongoDB stores LangGraph checkpoints plus auto-embedded, user-scoped semantic
-  memory. Memory supports continuity but never outranks enterprise evidence.
+  memory. A deterministic write gate retains only explicit user preferences, decisions, and
+  task context; ordinary enterprise Q&A is not promoted to durable memory.
+- Recent checkpoint turns and governed durable memory are retrieved in parallel. Older messages
+  are compacted into a bounded summary, and neither context source outranks enterprise evidence.
+  Recent context is role-normalized, user/assistant-only, citation-preserving, and avoids splitting
+  user/assistant turn boundaries during compaction.
 - All persisted and retrieved records are scoped by `realm_id`; memory also uses
   `user_id`.
 
 ## Architecture
 
-`intent parser → semantic memory → parallel source agents → Voyage reranking →
-deterministic reconciliation → Grove grounded writer → memory`
+`validated identity → intent parser → parallel recent/durable context + hybrid source agents →
+Voyage reranking → deterministic reconciliation → Grove grounded writer → selective memory → compaction`
 
 See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the complete component diagram, retrieval
 sequence, MongoDB/Voyage rationale, resilience paths, and validation status.
 See [`SECURITY.md`](SECURITY.md) for provider data flows and production release gates.
+See [`OPERATIONS.md`](OPERATIONS.md) for readiness, SLO, restore, deletion, and incident procedures.
 
 ## Contradiction behavior
 
-- Normalized claims group artifacts that make competing assertions about the same fact.
+- Indexed claim assertions group artifacts that make competing assertions about the same fact.
 - Reconciliation preserves every supporting artifact ID for audit but selects one scored
   representative for each competing value.
 - Representatives include document type, lifecycle status, update timestamp, and truth score.
@@ -52,7 +61,8 @@ See [`SECURITY.md`](SECURITY.md) for provider data flows and production release 
 ## Prerequisites
 
 - Python 3.11+ (the local environment uses Python 3.13).
-- A MongoDB Atlas cluster with Vector Search and Automated Embedding available.
+- MongoDB Atlas 8.0+ with Search, Vector Search, `$rankFusion`, and Automated Embedding
+  available (the validated demo cluster runs MongoDB 8.3).
 - Voyage indexing and query keys configured for Automated Embedding in Atlas.
   They are configured in Atlas, not passed through this application's CLI.
 - A separate application-side Voyage API key for `rerank-2.5`. Set `VOYAGE_API_KEY`;
@@ -81,7 +91,8 @@ mypy agent core data db evals scripts ui app.py chainlit_app.py`.
    `VOYAGE_API_KEY`.
 2. Install with `uv sync --frozen --group dev`, or use
    `.venv/bin/python -m pip install -r requirements.txt` for the legacy pip workflow.
-3. Seed 800 deterministic healthcare reference artifacts and request six Automated Embedding indexes:
+3. Seed 800 artifacts, protected governance and claim records, validators, five lexical indexes,
+   five Automated Embedding indexes, and one memory index:
    `.venv/bin/python app.py bootstrap --wait`
 4. Ask a contradiction-rich demo question:
    `.venv/bin/python app.py ask "How does the Rx API authenticate partners, and is any source stale?"`
@@ -98,6 +109,28 @@ contradictions, citations, degraded capabilities, and semantic memory in expanda
 steps and side-panel inspectors. In local mode, Grove tokens stream through LangGraph's custom
 event channel under an explicit unverified-draft label; production buffers them until the
 application binds verified source links to the completed answer.
+
+The UI includes an explicit **Architecture** header link and a README/welcome preview that open
+`/public/solution-architecture.png`. The architecture diagram is intentionally not attached as an
+automatic side tab on every chat; users open it only when they want the visual design reference.
+Use `/health` for process liveness and `/ready` for MongoDB/index readiness, content-free
+connection-pool and memory counters, and active agent/prompt/embedding version identifiers.
+
+## Embeddings and reranking
+
+This demo uses embeddings through **Atlas Automated Embedding**, not through visible vector fields
+stored in the documents. The embedded text path is `content`.
+
+| Collection(s) | Vector Search index | Embedded path | Model | Visible vector field? |
+|---|---|---|---|---|
+| `github`, `confluence`, `jira`, `sharepoint`, `teams` | `content_vector_acl` | `content` | `voyage-4` | No |
+| `memories` | `memory_vector_retained` | `content` | `voyage-4` | No |
+
+The five source collections also have lexical Atlas Search indexes named `content_lexical` for
+exact terms, IDs, titles, and artifact identifiers. Source retrieval runs semantic Vector Search
+and lexical Search with tenant/ACL filters, then combines them with `$rankFusion`. Voyage
+`rerank-2.5` reranks only the already-authorized candidates returned by Atlas. The final governing
+answer is then selected by deterministic reconciliation, not by the embedding or reranker model.
 
 The default connection timeouts are tuned for this low-concurrency demo: Atlas server
 selection fails after 5 seconds, connection establishment after 10 seconds, and an
@@ -137,11 +170,15 @@ LangGraph, Atlas, Grove, checkpoint, and memory path used by the UI.
 - `Compare eligibility cache controls for Member Portal, Benefits Engine, and Pharmacy Transaction Hub.`
 - `Create an executive risk brief covering Rx authentication, prior auth delivery, eligibility caching, and PHI logging. Surface stale or contradictory guidance.`
 
-**Multi-turn memory test**
+**Multi-turn context test**
 
 1. Ask `How do external partners authenticate to the Rx API today?`
 2. Follow with `Which source in your previous answer was stale, and why did it lose?`
 3. Then ask `Apply the same authority and freshness reasoning to the eligibility cache decision.`
+
+Follow-ups use bounded checkpoint context, not durable memory. The context pack excludes tool and
+system payloads, removes the current query from prior context, preserves prior citation labels such
+as `[jira:PA-44]`, and truncates long turns from the middle so both the setup and citations survive.
 
 The corpus contains 200 artifacts for each scenario and 160 artifacts in each of
 GitHub, Confluence, Jira, Teams, and SharePoint. The latest 160-record assurance expansion
@@ -192,7 +229,7 @@ retrieval checks covering JWKS rotation, PA dead-letter replay, eligibility inva
 break-glass PHI logging. Run `.venv/bin/python -m scripts.load_retrieval --rounds 3 --workers 5`
 for a bounded, metric-only concurrent Atlas retrieval smoke; it prints no document content.
 
-Current validated baseline: **81 unit/default-profile tests pass**, four credential-gated live
+Current validated baseline: **114 unit/default-profile tests pass**, four credential-gated live
 tests skip by default, **4/4 live RAG cases pass**, and **4/4 assurance retrieval cases pass**.
 
 ## Security note
@@ -206,12 +243,12 @@ Source retrieval now enforces both `realm_id` and an indexed intersection with e
 artifact's `access_principals`. Local mode uses `ACCESS_PRINCIPALS`; set
 `AUTH_MODE=password`, `AUTH_USERNAME`, `AUTH_PASSWORD`, and a strong
 `CHAINLIT_AUTH_SECRET` to enable Chainlit's local password callback. Password mode is
-for controlled demonstrations only—use enterprise OAuth/OIDC and map trusted identity
-claims to `realm_id`, `user_id`, and principals before external deployment.
+for controlled demonstrations only. Production requires `AUTH_MODE=oauth`, an
+`OAUTH_ALLOWED_PROVIDERS` allowlist, and validated realm/group claim mappings.
 
 Chainlit defaults to localhost-only origins, disabled uploads, a 30-minute connection
-session, and 24-hour user-session expiry. `APP_ENV=production` refuses to start while
-authentication is disabled, buffers unverified draft tokens, and requires HTTPS for Grove.
+session, and 24-hour user-session expiry. `APP_ENV=production` refuses non-OAuth auth,
+buffers unverified draft tokens, and requires HTTPS for Grove.
 Password-mode signing secrets must be non-placeholder values of at least 32 characters.
 For deployment, replace the localhost origins with the
 exact HTTPS application origin and integrate enterprise OAuth/OIDC before exposure.
@@ -222,10 +259,12 @@ credentials, and raw exception text are excluded. Configure `LOG_LEVEL`,
 `GROVE_TIMEOUT_SECONDS`, `GROVE_MAX_RETRIES`, `VOYAGE_RERANK_TIMEOUT_SECONDS`, and
 `VOYAGE_RERANK_MAX_RETRIES` for the deployment environment.
 
-Semantic memories are redacted, content-deduplicated, capped per user, excluded when
-tombstoned or expired, protected by a unique identity index, and removed by a TTL index after
-`MEMORY_RETENTION_DAYS`. Chainlit reuses one process-level MongoDB client instead of creating
-a connection pool per chat session.
+Durable memories are selectively written, redacted, typed, importance-scored, semantically
+merged or reinforced, versioned, provenance-tagged, capped per user, and filtered by tenant,
+user, type, validity, tombstone, and expiry. Deletion immediately suppresses and redacts both
+content and summary; TTL later removes the document. Chainlit reuses one process-level MongoDB
+client instead of creating a connection pool per chat session.
+Pool size and wait-queue limits are configurable, and `/ready` exposes only counters.
 LangGraph checkpoints use `CHECKPOINT_RETENTION_DAYS`. To exercise the confirmed
 deletion path, run `.venv/bin/python app.py forget --confirm`; use `--user-id` only as
 an authorized realm administrator.

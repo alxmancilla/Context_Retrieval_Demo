@@ -39,6 +39,10 @@
     },
     "require_canonical_winner": true,
     "max_source_appendix_artifacts": 6,
-    "required_term_groups": [["redact"], ["raw payload"], ["suggest"]]
+    "required_term_groups": [
+      ["redact"],
+      ["raw payload"],
+      ["suggest", "historical", "old practice", "legacy"]
+    ]
   }
 ]

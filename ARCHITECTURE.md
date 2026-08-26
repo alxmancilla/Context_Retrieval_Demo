@@ -2,6 +2,10 @@
 
 ## Solution diagram
 
+The Chainlit UI exposes a pre-rendered visual version of this diagram through the explicit
+**Architecture** header link and the README/welcome preview. It is not opened automatically as a
+chat side tab.
+
 ```mermaid
 flowchart LR
     U[Enterprise User] --> UI[Chainlit UI]
@@ -11,8 +15,8 @@ flowchart LR
     subgraph APP[LangGraph Agent Runtime]
         direction TB
         LG[Coordinator] --> INT[Intent Parsing<br/>Source Routing]
-        INT --> MEM[Semantic Memory Retrieval]
-        MEM --> FAN[Parallel Source Fan-out]
+        INT --> MEM[Recent Context + Durable Memory]
+        INT --> FAN[Parallel Source Fan-out]
         FAN --> GH[GitHub Agent]
         FAN --> CF[Confluence Agent]
         FAN --> JI[Jira Agent]
@@ -31,9 +35,10 @@ flowchart LR
     subgraph ATLAS[MongoDB Atlas — Context and State Plane]
         direction TB
         SRC[(Five Source Collections<br/>Flexible Artifact Documents)]
-        IDX[Automated Embedding: voyage-4<br/>Vector Search + ACL Pre-filters]
-        REG[(Source Registry + Artifact Governance<br/>Authority + Lifecycle Policy)]
-        SM[(Semantic Memory<br/>User Scope + TTL)]
+        IDX[Hybrid Search<br/>Vector + Lexical + ACL + Rank Fusion]
+        REG[(Protected Governance<br/>Authority + Lifecycle Policy)]
+        CLM[(Indexed Claim Assertions<br/>ACL-scoped Alternatives)]
+        SM[(Governed Memory Nodes<br/>Type + Validity + Provenance + TTL)]
         CP[(LangGraph Checkpoints<br/>Thread State + TTL)]
         SRC --- IDX
     end
@@ -42,6 +47,7 @@ flowchart LR
     IDX --> GH & CF & JI & SP & TM
     MEM <--> SM
     REC <--> REG
+    GH & CF & JI & SP & TM <--> CLM
     LG <--> CP
     GEN <--> GROVE[Azure Grove<br/>GPT-5.6-sol]
     RR <--> VOYAGE[Voyage AI<br/>rerank-2.5]
@@ -53,32 +59,33 @@ flowchart LR
 
 ## High-level architecture
 
-1. **Experience and security:** Chainlit provides the user experience. Authentication
-   resolves a tenant realm, user identity, and document access principals.
-2. **Agent orchestration:** LangGraph coordinates intent parsing, memory retrieval,
-   parallel source searches, reranking, reconciliation, generation, and persistence.
+1. **Experience and security:** Chainlit provides the user experience. Production requires an
+   allowed OAuth provider and validated realm/group claims; missing identity scope fails closed.
+2. **Agent orchestration:** After identity and intent validation, LangGraph retrieves bounded
+   recent turns, governed durable memory, and all selected sources in the same parallel superstep.
 3. **Source-aware retrieval:** Thin agents represent GitHub, Confluence, Jira,
-   SharePoint, and Teams. Atlas applies realm and ACL filters before vector ranking.
+   SharePoint, and Teams. Atlas applies realm and ACL filters independently to lexical and vector
+   retrieval, then `$rankFusion` combines both rankings.
 4. **Global reranking:** Voyage `rerank-2.5` compares every retrieved candidate directly
    with the rewritten query. Results remain aligned to their original Atlas documents.
-5. **Deterministic reasoning:** Configurable semantic relevance, authority, and freshness
-   weights rank evidence and expose normalized claim contradictions. Artifact-level policy
-   authority and lifecycle status can refine source defaults. Voyage relevance is the semantic
-   component when available; Atlas vector similarity is the fallback.
+5. **Deterministic reasoning:** Configurable relevance, authority, and freshness weights rank
+   evidence. Runtime truth metadata comes only from protected governance records; indexed claim
+   assertions provide ACL-scoped contradiction representatives.
 6. **Grounded generation:** Azure Grove writes the response after reconciliation.
    Model-supplied citation URLs are removed; binding accepts only artifacts present in the
    retrieved evidence set. Production buffers draft tokens until this verification completes.
-7. **State and operations:** MongoDB stores artifacts, source policy, semantic memory,
-   and LangGraph checkpoints. Chainlit sessions share one process-level MongoDB client and
-   graph runtime. TTL and unique memory indexes enforce lifecycle and identity, while structured
-   logs expose correlation identifiers and degraded capabilities.
+7. **State and operations:** LangGraph checkpoints retain execution state and recent turns;
+   governed memory nodes retain only selected cross-session continuity. Older turns are compacted,
+   while TTL and unique indexes enforce lifecycle and identity. Structured logs and `/ready`
+   expose content-free memory outcomes, context volume, versions, and degraded capabilities.
 
 ## Retrieval and ranking sequence
 
-1. Atlas Automated Embedding uses `voyage-4` to maintain document vectors.
-2. Each source agent executes Atlas Vector Search with `realm_id` and
-   `access_principals` pre-filters, then scans a bounded window for one permission-scoped
-   representative of each of up to three alternate claim values.
+1. Atlas Automated Embedding uses `voyage-4` to maintain vectors for the `content` path inside
+   Atlas Search indexes. The application documents do not contain visible `embedding` arrays.
+   Explicit lexical indexes cover titles, content, and artifact identifiers.
+2. Each source executes ACL-filtered semantic and lexical pipelines. MongoDB `$rankFusion`
+   combines them, and indexed claim records supply up to three alternate-value representatives.
 3. Voyage `rerank-2.5` globally scores every retrieved candidate; `top_k=None` preserves
    all evidence needed for contradiction analysis.
 4. The truth score combines 55% semantic relevance, 30% source authority, and 15%
@@ -101,6 +108,10 @@ flowchart LR
 - **Deterministic scoring:** Conflict resolution remains explainable, configurable, and testable.
 - **LLM after retrieval:** Grove generates grounded prose but does not establish authority.
 - **Verified citations:** References are bound to actual retrieved documents.
+- **Trusted governance boundary:** Connector-owned metadata cannot elevate reconciliation
+  authority; protected policy records are overlaid before scoring.
+- **Schema enforcement:** Ten application collections use MongoDB JSON Schema validators;
+  production defaults to `strict`/`error`.
 - **Convergent index bootstrap:** Existing autoEmbed definitions are normalized and compared;
   compatible drift updates in place, while incompatible index types fail explicitly.
 - **Defense-in-depth authorization:** Tenant and ACL constraints execute inside Atlas retrieval.
@@ -125,8 +136,8 @@ schema migrations.
 
 ### Retrieval with authorization
 
-Atlas Vector Search combines semantic retrieval with `realm_id` and `access_principals`
-pre-filters. Unauthorized documents are excluded before ranking rather than filtered later
+Atlas Search and Vector Search both apply `realm_id` and `access_principals` filters.
+Unauthorized documents are excluded before rank fusion rather than filtered later
 in application code, making retrieval part of the authorization boundary.
 
 Reranking occurs only after this boundary, so Voyage receives candidates the authenticated
@@ -138,6 +149,16 @@ Atlas Automated Embedding uses Voyage `voyage-4` to create and maintain vectors 
 document content. The application stores business documents without coordinating a separate
 embedding pipeline and vector synchronization process. New and updated documents become
 searchable through the same managed index lifecycle.
+
+The generated vectors are part of the managed Atlas Vector Search index definitions, not normal
+MongoDB document fields. Inspect the Atlas Search index definitions rather than source documents
+to verify embedding usage:
+
+- `content_vector_acl` on `github`, `confluence`, `jira`, `sharepoint`, and `teams`
+- `memory_vector_retained` on `memories`
+
+All of these embed the `content` field using `voyage-4`. Source collections also have
+`content_lexical` search indexes for exact-term retrieval before `$rankFusion`.
 
 ### Voyage AI retrieval quality
 
@@ -163,16 +184,24 @@ authorized recall, while Voyage improves semantic precision before governed reco
 
 ### Stateful-agent support
 
-MongoDB durably stores LangGraph checkpoints and user-scoped semantic memory beside source
-evidence. TTL indexes, tombstones, deduplication, and bounded retention provide lifecycle
-controls without introducing another persistence system. A unique partial `memory_id` index
-protects deterministic upserts from concurrent duplication.
+MongoDB durably stores LangGraph checkpoints separately from user-scoped memory nodes. A
+deterministic policy accepts only explicit preferences, decisions, and task context; enterprise
+answers remain source evidence rather than learned truth. Memory nodes carry type, importance,
+validity, immutable creation provenance, reinforcement revision, embedding profile, prompt/agent
+versions, tombstone, and TTL metadata. Exact duplicates reinforce atomically, high-similarity
+nodes merge without changing identity content, and deleted identities cannot be resurrected.
+
+Recent raw turns are bounded in the prompt. Older checkpoint messages are deterministically
+compacted into a capped summary and removed from active message state after clean handoff. The
+context pack normalizes roles to `user`/`assistant`, excludes tool and system payloads, removes the
+current query from prior context, preserves citation labels, reserves budget for the compacted
+summary, and avoids splitting a user/assistant turn across the compaction boundary.
 
 ### Explainable reconciliation
 
-The source registry and normalized claims support authority, freshness decay, contradiction
-detection, and calibrated truth scores. Policies remain queryable and auditable instead of
-being hidden in prompts.
+The source registry, protected governance records, and indexed claim assertions support
+authority, freshness decay, contradiction detection, and calibrated truth scores. Policies
+remain queryable and auditable instead of being hidden in prompts.
 
 Contradiction decisions retain all supporting artifact IDs for audit, but send one scored
 representative per competing value to the writer. This guarantees that stale evidence is
@@ -197,7 +226,7 @@ visible in the evidence inspector for auditability.
   invalidation, and break-glass logging.
 - A 15-operation, five-worker Atlas retrieval smoke completed with zero errors and no content
   logging; this is a bounded smoke, not a production capacity benchmark.
-- The default test profile reports **81 passed and four credential-gated live tests skipped**;
+- The default test profile reports **114 passed and four credential-gated live tests skipped**;
   Ruff, mypy, dependency validation, and IDE diagnostics pass.
 - Atlas vector-score fallback is covered by deterministic failure-path tests.
 

@@ -1,15 +1,28 @@
+import logging
+
 from langchain_core.messages import AIMessage
+from langchain_core.messages.modifier import RemoveMessage
 from langgraph.config import get_stream_writer
 from pymongo.database import Database
 
 from agent.prompts import ANSWER_SYSTEM, INTENT_SYSTEM, answer_prompt
 from core.citations import bind_source_links
+from core.conversation import compact_conversation, recent_conversation_context
 from core.memory import SemanticMemory
+from core.memory_policy import MEMORY_SCHEMA_VERSION, decide_memory_write
 from core.observability import get_logger, log_event, log_failure
 from core.providers.chat import GroveChatProvider
 from core.providers.rerank import VoyageReranker
 from core.reconciliation import DEFAULT_RECONCILIATION_WEIGHTS, ReconciliationWeights, reconcile
-from core.schemas import ALL_SOURCES, AgentState, Intent, SourceName
+from core.schemas import (
+    ALL_SOURCES,
+    CLAIM_ASSERTIONS_COLLECTION,
+    GOVERNANCE_COLLECTION,
+    AgentState,
+    Intent,
+    SourceName,
+)
+from core.security import validate_agent_scope
 from core.source_agents import SourceAgent
 
 LOGGER = get_logger("agent.nodes")
@@ -18,28 +31,70 @@ LOGGER = get_logger("agent.nodes")
 class AgentNodes:
     reconciliation_weights = DEFAULT_RECONCILIATION_WEIGHTS
     reranker: VoyageReranker | None = None
+    memory_min_importance = 0.65
+    prompt_version = "answer-v2"
+    agent_version = "memory-v2"
+    recent_context_messages = 6
+    recent_context_max_chars = 4000
+    conversation_summary_max_chars = 1500
 
     def __init__(self, db: Database, chat: GroveChatProvider, source_top_k: int,
                  memory_top_k: int, memory_retention_days: int = 30,
                  memory_max_per_user: int = 100,
+                 memory_min_importance: float = 0.65,
+                 memory_similarity_threshold: float = 0.92,
+                 memory_embedding_profile: str = "voyage-4:auto-embed:v1",
+                 prompt_version: str = "answer-v2",
+                 agent_version: str = "memory-v2",
+                 recent_context_messages: int = 6,
+                 recent_context_max_chars: int = 4000,
+                 conversation_summary_max_chars: int = 1500,
                  reconciliation_weights: ReconciliationWeights = DEFAULT_RECONCILIATION_WEIGHTS,
                  reranker: VoyageReranker | None = None,
                  ) -> None:
         self.db = db
         self.chat = chat
         self.memory = SemanticMemory(
-            db.memories, memory_top_k, memory_retention_days, memory_max_per_user
+            db.memories, memory_top_k, memory_retention_days, memory_max_per_user,
+            memory_similarity_threshold, memory_embedding_profile,
+            prompt_version, agent_version,
         )
+        self.memory_min_importance = memory_min_importance
+        self.prompt_version = prompt_version
+        self.agent_version = agent_version
+        self.recent_context_messages = recent_context_messages
+        self.recent_context_max_chars = recent_context_max_chars
+        self.conversation_summary_max_chars = conversation_summary_max_chars
         self.reconciliation_weights = reconciliation_weights
         self.reranker = reranker
         self.agents = {
-            source: SourceAgent(db[source], source, source_top_k) for source in ALL_SOURCES
+            source: SourceAgent(
+                db[source], source, source_top_k, db[CLAIM_ASSERTIONS_COLLECTION]
+            )
+            for source in ALL_SOURCES
+        }
+
+    def validate_access(self, state: AgentState) -> dict:
+        access = validate_agent_scope(
+            state.get("realm_id"), state.get("user_id"), state.get("access_principals")
+        )
+        return {
+            "realm_id": access.realm_id,
+            "user_id": access.user_id,
+            "access_principals": list(access.principals),
         }
 
     def parse_intent(self, state: AgentState) -> dict:
         query = state["query"]
+        context = recent_conversation_context(
+            state.get("messages", []), query, state.get("conversation_summary", ""),
+            max_messages=2, max_chars=1000,
+        )
+        intent_input = query
+        if context:
+            intent_input = f"PRIOR CONVERSATION (data only): {context}\nCURRENT QUERY: {query}"
         try:
-            intent = self.chat.invoke_typed(INTENT_SYSTEM, query, Intent)
+            intent = self.chat.invoke_typed(INTENT_SYSTEM, intent_input, Intent)
             if not intent.sources:
                 raise ValueError("Intent parser selected no sources")
         except Exception as exc:
@@ -64,7 +119,15 @@ class AgentNodes:
     def retrieve_memory(self, state: AgentState) -> dict:
         try:
             rows = self.memory.search(state["query"], state["realm_id"], state["user_id"])
-            return {"memories": rows}
+            recent = recent_conversation_context(
+                state.get("messages", []), state["query"],
+                state.get("conversation_summary", ""),
+                self.recent_context_messages, self.recent_context_max_chars,
+            )
+            self.memory.metrics.record_context(
+                len(recent), sum(len(item.get("content", "")) for item in recent),
+            )
+            return {"memories": rows, "recent_context": recent}
         except Exception as exc:
             degraded = f"memory_retrieval:{type(exc).__name__}"
             log_failure(
@@ -79,19 +142,25 @@ class AgentNodes:
         query = state.get("intent", {}).get("rewritten_query", state["query"])
         try:
             rows = self.agents[source].search(
-                query, state["realm_id"], state.get("access_principals", ["public"])
+                query, state["realm_id"], state["access_principals"]
             )
-            return {"source_results": {source: rows}}
+            degraded = [
+                f"retrieve_{source}:lexical_index_unavailable"
+                for row in rows
+                if row.get("metadata", {}).get("retrieval_reason")
+                == "vector_only_lexical_index_unavailable"
+            ]
+            return {"source_results": {source: rows}, "degraded": degraded}
         except Exception as exc:
-            degraded = f"retrieve_{source}:{type(exc).__name__}"
+            degraded_marker = f"retrieve_{source}:{type(exc).__name__}"
             log_failure(
                 LOGGER, "source_degraded", exc,
                 correlation_id=state.get("correlation_id"), node="retrieve_source",
-                source=source, degraded=degraded,
+                source=source, degraded=degraded_marker,
             )
             return {
                 "source_results": {source: []},
-                "degraded": [degraded],
+                "degraded": [degraded_marker],
             }
 
     def reconcile(self, state: AgentState) -> dict:
@@ -111,7 +180,40 @@ class AgentNodes:
         missing_sources = sorted(
             source for source, hits in results.items() if hits and source not in registry
         )
-        degraded = []
+        registered_results = {
+            source: hits for source, hits in results.items() if source in registry
+        }
+        artifact_ids = [
+            hit["artifact_id"] for hits in registered_results.values() for hit in hits
+        ]
+        policies = {
+            row["artifact_id"]: row
+            for row in self.db[GOVERNANCE_COLLECTION].find(
+                {"realm_id": state["realm_id"], "artifact_id": {"$in": artifact_ids}},
+                {"_id": 0},
+            )
+        }
+        missing_policy = False
+        trusted_results: dict[str, list[dict]] = {}
+        for source, hits in registered_results.items():
+            trusted_results[source] = []
+            for hit in hits:
+                trusted = dict(hit)
+                policy = policies.get(hit["artifact_id"])
+                if policy:
+                    trusted["governance"] = {
+                        "document_type": policy["document_type"],
+                        "lifecycle_status": policy["lifecycle_status"],
+                        **({"authority_override": policy["authority_override"]}
+                           if policy.get("authority_override") is not None else {}),
+                    }
+                else:
+                    trusted["governance"] = {
+                        "document_type": "unverified", "lifecycle_status": "active",
+                    }
+                    missing_policy = True
+                trusted_results[source].append(trusted)
+        degraded = ["governance_policy_missing"] if missing_policy else []
         for source in missing_sources:
             marker = f"source_registry_missing:{source}"
             degraded.append(marker)
@@ -120,9 +222,6 @@ class AgentNodes:
                 correlation_id=state.get("correlation_id"), node="reconcile",
                 source=source, degraded=marker,
             )
-        trusted_results = {
-            source: hits for source, hits in results.items() if source in registry
-        }
         if self.reranker:
             candidates = [hit for hits in trusted_results.values() for hit in hits]
             try:
@@ -162,7 +261,7 @@ class AgentNodes:
             return {"answer": answer, "messages": [AIMessage(content=answer)]}
         prompt = answer_prompt(
             state["query"], hits, state.get("contradictions", []),
-            state.get("memories", []),
+            state.get("memories", []), state.get("recent_context", []),
         )
         try:
             writer = get_stream_writer()
@@ -188,11 +287,35 @@ class AgentNodes:
 
     def save_memory(self, state: AgentState) -> dict:
         try:
-            self.memory.save(
-                f"Question: {state['query']}\nAnswer: {state['answer'][:2500]}",
-                state["realm_id"], state["user_id"], state["correlation_id"],
+            decision = decide_memory_write(
+                state["query"], state["answer"], state.get("degraded", []),
+                self.memory_min_importance,
             )
-            return {}
+            self.memory.metrics.record_decision(decision.accepted)
+            log_event(
+                LOGGER, logging.INFO, "memory_write_decided",
+                correlation_id=state.get("correlation_id"), node="save_memory",
+                accepted=decision.accepted, reason=decision.reason,
+                memory_type=decision.memory_type, importance=decision.importance,
+                schema_version=MEMORY_SCHEMA_VERSION,
+                prompt_version=self.prompt_version, agent_version=self.agent_version,
+            )
+            write = {
+                "accepted": decision.accepted, "reason": decision.reason,
+                "memory_type": decision.memory_type,
+                "importance": decision.importance,
+                "schema_version": MEMORY_SCHEMA_VERSION,
+                "embedding_profile": getattr(self.memory, "embedding_profile", "unknown"),
+                "prompt_version": self.prompt_version,
+                "agent_version": self.agent_version,
+            }
+            if not decision.accepted:
+                return {"memory_write": write}
+            outcome = self.memory.save(
+                decision, state["realm_id"], state["user_id"],
+                state["correlation_id"], state["correlation_id"],
+            )
+            return {"memory_write": {**write, "outcome": outcome}}
         except Exception as exc:
             degraded = f"memory_save:{type(exc).__name__}"
             log_failure(
@@ -201,3 +324,14 @@ class AgentNodes:
                 degraded=degraded,
             )
             return {"degraded": [degraded]}
+
+    def compact_conversation(self, state: AgentState) -> dict:
+        summary, removable_ids = compact_conversation(
+            state.get("messages", []), state.get("conversation_summary", ""),
+            self.recent_context_messages, self.conversation_summary_max_chars,
+        )
+        self.memory.metrics.record_context(0, compacted=len(removable_ids))
+        result: dict = {"conversation_summary": summary}
+        if removable_ids:
+            result["messages"] = [RemoveMessage(id=message_id) for message_id in removable_ids]
+        return result

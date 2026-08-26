@@ -39,6 +39,9 @@ def main() -> None:
         server_selection_timeout_ms=settings.mongodb_server_selection_timeout_ms,
         connect_timeout_ms=settings.mongodb_connect_timeout_ms,
         socket_timeout_ms=settings.mongodb_socket_timeout_ms,
+        max_pool_size=settings.mongodb_max_pool_size,
+        min_pool_size=settings.mongodb_min_pool_size,
+        wait_queue_timeout_ms=settings.mongodb_wait_queue_timeout_ms,
     )
     jobs: list[tuple[SourceName, str]] = [
         (source, QUERIES[round_index % len(QUERIES)])
@@ -56,6 +59,7 @@ def main() -> None:
     latencies: list[float] = []
     hit_count = 0
     errors = 0
+    started = time.monotonic()
     try:
         with ThreadPoolExecutor(max_workers=args.workers) as executor:
             futures = [executor.submit(search, source, query) for source, query in jobs]
@@ -68,11 +72,15 @@ def main() -> None:
                     errors += 1
     finally:
         client.close()
+    elapsed = max(time.monotonic() - started, 0.001)
     result = {
         "operations": len(jobs), "workers": args.workers, "errors": errors,
         "hits": hit_count,
+        "operations_per_second": round(len(jobs) / elapsed, 2),
+        "p50_ms": round(percentile(latencies, 0.50) * 1000, 2),
         "mean_ms": round(statistics.fmean(latencies) * 1000, 2) if latencies else 0.0,
         "p95_ms": round(percentile(latencies, 0.95) * 1000, 2),
+        "p99_ms": round(percentile(latencies, 0.99) * 1000, 2),
     }
     print(json.dumps(result))
     if errors or hit_count == 0:

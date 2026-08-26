@@ -9,6 +9,9 @@ SourceName = Literal["github", "confluence", "jira", "sharepoint", "teams"]
 ALL_SOURCES: tuple[SourceName, ...] = (
     "github", "confluence", "jira", "sharepoint", "teams"
 )
+GOVERNANCE_COLLECTION = "artifact_governance"
+CLAIM_ASSERTIONS_COLLECTION = "claim_assertions"
+THREAD_OWNERSHIP_COLLECTION = "thread_ownership"
 
 
 class Intent(BaseModel):
@@ -84,6 +87,9 @@ class AgentState(TypedDict, total=False):
     selected_sources: list[SourceName]
     source_results: Annotated[dict[str, list[dict]], merge_source_results]
     memories: list[dict]
+    recent_context: list[dict[str, Any]]
+    conversation_summary: str
+    memory_write: dict[str, Any]
     ranked_hits: list[dict]
     contradictions: list[dict]
     answer: str

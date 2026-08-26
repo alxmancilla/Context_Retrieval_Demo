@@ -48,8 +48,11 @@ def test_chainlit_starts_and_publishes_expected_settings():
                 time.sleep(0.25)
         else:
             pytest.fail("Chainlit did not become healthy within 30 seconds")
+        with urlopen(f"{base_url}/ready", timeout=30) as response:
+            ready = json.load(response)
         with urlopen(f"{base_url}/project/settings", timeout=3) as response:
             settings = json.load(response)
+        assert ready["search_indexes_ready"] == 11
         assert len(settings.get("starters") or []) == 12
         assert settings["ui"]["name"] == "AI Context Platform Assistant"
     finally:

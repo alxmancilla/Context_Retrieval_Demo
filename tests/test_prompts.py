@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from agent.prompts import select_answer_evidence
+from agent.prompts import answer_prompt, select_answer_evidence
 
 
 def _hit(artifact_id: str) -> dict:
@@ -26,3 +26,11 @@ def test_answer_evidence_includes_low_ranked_conflict_representative():
     assert "current-0" in selected_ids
     assert "historical" in selected_ids
     assert "current-14" not in selected_ids
+
+
+def test_answer_prompt_labels_recent_context_as_non_authoritative():
+    prompt = answer_prompt(
+        "follow up", [], [], [], [{"role": "human", "content": "prior turn"}],
+    )
+    assert "RECENT CONVERSATION (NON-AUTHORITATIVE)" in prompt
+    assert "prior turn" in prompt

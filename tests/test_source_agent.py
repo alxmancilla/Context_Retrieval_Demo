@@ -1,7 +1,12 @@
 import pytest
 from pymongo.errors import OperationFailure
 
-from core.source_agents import SOURCE_VECTOR_INDEX, SearchIndexNotReady, SourceAgent
+from core.source_agents import (
+    SOURCE_LEXICAL_INDEX,
+    SOURCE_VECTOR_INDEX,
+    SearchIndexNotReady,
+    SourceAgent,
+)
 
 
 class FakeCollection:
@@ -24,7 +29,9 @@ def test_source_agent_uses_text_query_and_permission_filter():
     rows = agent.search(
         "How does auth work?", "realm-a", ["role:platform-engineer", "user:alice"]
     )
-    vector = collection.pipeline[0]["$vectorSearch"]
+    fusion = collection.pipeline[0]["$rankFusion"]
+    vector = fusion["input"]["pipelines"]["semantic"][0]["$vectorSearch"]
+    lexical = fusion["input"]["pipelines"]["lexical"][0]["$search"]
     assert vector["query"] == "How does auth work?"
     assert vector["index"] == SOURCE_VECTOR_INDEX
     assert vector["filter"] == {"$and": [
@@ -32,6 +39,14 @@ def test_source_agent_uses_text_query_and_permission_filter():
         {"access_principals": {"$in": ["role:platform-engineer", "user:alice"]}},
     ]}
     assert "queryVector" not in vector
+    assert lexical["index"] == SOURCE_LEXICAL_INDEX
+    assert lexical["compound"]["filter"] == [
+        {"equals": {"path": "realm_id", "value": "realm-a"}},
+        {"in": {
+            "path": "access_principals",
+            "value": ["role:platform-engineer", "user:alice"],
+        }},
+    ]
     assert rows[0]["artifact_id"] == "github-test"
 
 
@@ -75,21 +90,31 @@ def test_contradiction_probe_is_permission_scoped_and_conservative():
                 "claims": {"auth": "oauth1"}, "metadata": {},
             }])
 
+    class ClaimCollection:
+        def find(self, query, _projection):
+            self.query = query
+            return Cursor([{
+                "artifact_id": "github-old", "claim_value": "oauth1",
+                "updated_at": "2024-01-01T00:00:00Z",
+            }])
+
     collection = ContradictionCollection()
+    claims = ClaimCollection()
     current = {
         "artifact_id": "github-current", "source": "github", "title": "Current",
         "content": "OAuth 2", "url": "https://demo/current",
         "updated_at": "2026-08-01T00:00:00Z", "vector_score": 0.9,
         "claims": {"auth": "oauth2"}, "metadata": {},
     }
-    rows = SourceAgent(collection, "github", 5)._with_contradiction_candidates(
+    rows = SourceAgent(collection, "github", 5, claims)._with_contradiction_candidates(
         [current], "realm-a", ["role:platform-engineer"]
     )
     assert len(rows) == 2
     assert rows[1]["vector_score"] == 0.0
     assert rows[1]["metadata"]["retrieval_reason"] == "contradiction_probe"
+    assert claims.query["realm_id"] == "realm-a"
+    assert claims.query["access_principals"] == {"$in": ["role:platform-engineer"]}
     assert {"realm_id": "realm-a"} in collection.query["$and"]
-    assert {"access_principals": {"$in": ["role:platform-engineer"]}} in collection.query["$and"]
 
 
 def test_contradiction_probe_keeps_one_representative_per_alternate_value():
@@ -123,13 +148,24 @@ def test_contradiction_probe_keeps_one_representative_per_alternate_value():
                 },
             ])
 
+    class Claims:
+        def find(self, _query, _projection):
+            return Cursor([
+                {"artifact_id": "old-1", "claim_value": "oauth1",
+                 "updated_at": "2024-01-03T00:00:00Z"},
+                {"artifact_id": "old-2", "claim_value": "oauth1",
+                 "updated_at": "2024-01-02T00:00:00Z"},
+                {"artifact_id": "legacy", "claim_value": "api_key",
+                 "updated_at": "2024-01-01T00:00:00Z"},
+            ])
+
     current = {
         "artifact_id": "current", "source": "github", "title": "Current",
         "content": "OAuth 2", "url": "https://demo/current",
         "updated_at": "2026-08-01T00:00:00Z", "vector_score": 0.9,
         "claims": {"auth": "oauth2"}, "metadata": {},
     }
-    rows = SourceAgent(Collection(), "github", 5)._with_contradiction_candidates(
+    rows = SourceAgent(Collection(), "github", 5, Claims())._with_contradiction_candidates(
         [current], "realm", ["role:platform-engineer"]
     )
     assert [row["claims"]["auth"] for row in rows] == ["oauth2", "oauth1", "api_key"]
