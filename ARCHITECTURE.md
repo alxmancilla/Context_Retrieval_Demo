@@ -50,7 +50,7 @@ flowchart LR
     GH & CF & JI & SP & TM <--> CLM
     LG <--> CP
     GEN <--> GROVE[Azure Grove<br/>GPT-5.6-sol]
-    RR <--> VOYAGE[Voyage AI<br/>rerank-2.5]
+    RR <--> VOYAGE[Voyage AI<br/>rerank-3]
     RR -. timeout or error .-> FALLBACK[Atlas Vector Score Fallback]
     FALLBACK --> REC
     CIT --> UI
@@ -66,7 +66,7 @@ flowchart LR
 3. **Source-aware retrieval:** Thin agents represent GitHub, Confluence, Jira,
    SharePoint, and Teams. Atlas applies realm and ACL filters independently to lexical and vector
    retrieval, then `$rankFusion` combines both rankings.
-4. **Global reranking:** Voyage `rerank-2.5` compares every retrieved candidate directly
+4. **Global reranking:** Voyage `rerank-3` compares every retrieved candidate directly
    with the rewritten query. Results remain aligned to their original Atlas documents.
 5. **Deterministic reasoning:** Configurable relevance, authority, and freshness weights rank
    evidence. Runtime truth metadata comes only from protected governance records; indexed claim
@@ -86,7 +86,7 @@ flowchart LR
    Explicit lexical indexes cover titles, content, and artifact identifiers.
 2. Each source executes ACL-filtered semantic and lexical pipelines. MongoDB `$rankFusion`
    combines them, and indexed claim records supply up to three alternate-value representatives.
-3. Voyage `rerank-2.5` globally scores every retrieved candidate; `top_k=None` preserves
+3. Voyage `rerank-3` globally scores every retrieved candidate; `top_k=None` preserves
    all evidence needed for contradiction analysis.
 4. The truth score combines 55% semantic relevance, 30% source authority, and 15%
    freshness by default. These weights are validated and configurable.
@@ -167,7 +167,7 @@ Voyage models complement MongoDB's operational and governance capabilities:
 - **Retrieval-specialized embeddings:** `voyage-4` represents semantic meaning rather than
   relying on exact keyword overlap, improving recall across differently worded enterprise
   questions and artifacts.
-- **High-precision reranking:** `rerank-2.5` jointly evaluates the rewritten query and each
+- **High-precision reranking:** `rerank-3` jointly evaluates the rewritten query and each
   candidate document. This cross-encoder stage provides a more precise relevance signal than
   vector distance alone.
 - **Long-context evidence handling:** The reranker supports a 32K-token context window, which
@@ -213,7 +213,7 @@ visible in the evidence inspector for auditability.
 
 ## Validation status
 
-- Live Voyage `rerank-2.5` API contract test passes.
+- Live Voyage `rerank-3` API contract test passes.
 - The end-to-end Atlas → Voyage → reconciliation → Grove flow reranked 26 candidates across
   all five source collections without capability degradation.
 - The PHI policy case selects the effective SharePoint policy over a historical Teams incident

@@ -27,7 +27,7 @@ Verify embedding configuration from Atlas **Search Indexes** or metadata-only di
 - Source lexical indexes: `content_lexical`, type `search`, mapped over title/content/artifact ID
   with tenant and principal filters.
 
-The application-side Voyage API key is used for `rerank-2.5`; Atlas Automated Embedding uses the
+The application-side Voyage API key is used for `rerank-3`; Atlas Automated Embedding uses the
 Voyage integration configured in Atlas and does not expose embedding credentials to the app.
 
 ## Suggested service objectives

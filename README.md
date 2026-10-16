@@ -3,8 +3,7 @@
 A source-aware, multi-agent RAG demo that simulates GitHub, Confluence, Jira,
 SharePoint, and Teams using MongoDB Atlas collections. A LangGraph coordinator
 fans out to thin source specialists, then centrally reconciles authority,
-freshness, and explicit contradictions before asking Azure Grove for a grounded,
-cited answer.
+freshness, and explicit contradictions before asking Azure Grove for a grounded, cited answer.
 
 ## Key design choices
 
@@ -16,7 +15,7 @@ cited answer.
   so source documents do **not** expose an `embedding` array field.
 - Each source combines ACL-filtered semantic and lexical retrieval with MongoDB
   `$rankFusion`, improving recall for both concepts and exact identifiers.
-- Voyage `rerank-2.5` globally reranks ACL-filtered candidates before deterministic
+- Voyage `rerank-3` globally reranks ACL-filtered candidates before deterministic
   reconciliation. Atlas vector similarity remains the fallback if reranking is unavailable.
 - Source truth score defaults to 55% semantic relevance, 30% authority, and 15%
   freshness. The three validated `RECONCILIATION_*_WEIGHT` settings support calibrated
@@ -65,7 +64,7 @@ See [`OPERATIONS.md`](OPERATIONS.md) for readiness, SLO, restore, deletion, and 
   available (the validated demo cluster runs MongoDB 8.3).
 - Voyage indexing and query keys configured for Automated Embedding in Atlas.
   They are configured in Atlas, not passed through this application's CLI.
-- A separate application-side Voyage API key for `rerank-2.5`. Set `VOYAGE_API_KEY`;
+- A separate application-side Voyage API key for `rerank-3`. Set `VOYAGE_API_KEY`;
   Atlas does not expose its Automated Embedding credentials to the application.
 - An Azure Grove API key for `gpt-5.6-sol`.
 
@@ -129,7 +128,7 @@ stored in the documents. The embedded text path is `content`.
 The five source collections also have lexical Atlas Search indexes named `content_lexical` for
 exact terms, IDs, titles, and artifact identifiers. Source retrieval runs semantic Vector Search
 and lexical Search with tenant/ACL filters, then combines them with `$rankFusion`. Voyage
-`rerank-2.5` reranks only the already-authorized candidates returned by Atlas. The final governing
+`rerank-3` reranks only the already-authorized candidates returned by Atlas. The final governing
 answer is then selected by deterministic reconciliation, not by the embedding or reranker model.
 
 The default connection timeouts are tuned for this low-concurrency demo: Atlas server
