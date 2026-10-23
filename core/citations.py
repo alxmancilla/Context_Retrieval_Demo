@@ -4,6 +4,41 @@ MAX_SOURCE_APPENDIX_ARTIFACTS = 6
 SOURCE_LABEL = r"github|confluence|jira|sharepoint|teams"
 
 
+def _display_value(value: str) -> str:
+    return value.replace("_", " ")
+
+
+def _append_conflict_notes(base: str, hits: dict[str, dict], contradictions: list[dict]) -> str:
+    notes = []
+    for conflict in contradictions:
+        representatives = conflict.get("representatives", {})
+        if not representatives:
+            continue
+        preferred_value = conflict.get("preferred_value", "")
+        preferred = representatives.get(preferred_value, {})
+        preferred_hit = hits.get(preferred.get("artifact_id", ""))
+        if not preferred_hit:
+            continue
+        competing_parts = []
+        for value, representative in representatives.items():
+            if value == preferred_value:
+                continue
+            hit = hits.get(representative.get("artifact_id", ""))
+            if hit:
+                competing_parts.append(
+                    f"{_display_value(value)} [{hit['source']}:{hit['artifact_id']}]({hit['url']})"
+                )
+        if competing_parts:
+            notes.append(
+                f"- `{conflict['claim']}` resolves to {_display_value(preferred_value)} "
+                f"[{preferred_hit['source']}:{preferred_hit['artifact_id']}]({preferred_hit['url']}); "
+                f"historical or lower-authority evidence represented {', '.join(competing_parts)}."
+            )
+    if not notes:
+        return base
+    return f"{base}\n\nConflict notes:\n" + "\n".join(notes)
+
+
 def bind_source_links(answer: str, hits: list[dict], contradictions: list[dict]) -> str:
     """Bind verified inline links and append cited/contradictory evidence."""
     by_id = {hit["artifact_id"]: hit for hit in hits}
@@ -81,6 +116,7 @@ def bind_source_links(answer: str, hits: list[dict], contradictions: list[dict])
         r"\[\s*source(?:\s+[0-9]+)?\s*\](?!\()",
         bind_generic_source, base, flags=re.IGNORECASE,
     )
+    base = _append_conflict_notes(base, by_id, contradictions)
     contradiction_ids: list[str] = []
     for conflict in contradictions:
         contradiction_ids.append(conflict["preferred_artifact"])

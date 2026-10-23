@@ -7,7 +7,7 @@ class VoyageReranker:
     """Cross-encoder semantic reranking with aligned scores for every candidate."""
 
     def __init__(
-        self, *, api_key: str, model: str = "rerank-2.5",
+        self, *, api_key: str, model: str = "rerank-3",
         timeout_seconds: float = 15.0, max_retries: int = 2,
     ) -> None:
         self.model = model

@@ -80,7 +80,7 @@ def test_voyage_failure_falls_back_to_vector_scores():
             }]
 
     class FailedReranker:
-        model = "rerank-2.5"
+        model = "rerank-3"
 
         def rerank(self, *_args):
             raise TimeoutError("provider unavailable")

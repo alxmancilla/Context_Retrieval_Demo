@@ -1,5 +1,5 @@
 from collections.abc import Iterable
-from typing import Any
+from typing import Any, Literal
 
 from pymongo.collection import Collection
 from pymongo.errors import OperationFailure
@@ -10,6 +10,7 @@ SOURCE_VECTOR_INDEX = "content_vector_acl"
 SOURCE_LEXICAL_INDEX = "content_lexical"
 CONTRADICTION_PROBE_SCAN_LIMIT = 10
 CONTRADICTION_ALTERNATE_VALUE_LIMIT = 3
+RetrievalMode = Literal["hybrid", "vector", "lexical"]
 
 
 class SearchIndexNotReady(RuntimeError):
@@ -22,11 +23,13 @@ class SourceAgent:
     def __init__(
         self, collection: Collection, source: SourceName, top_k: int,
         claim_collection: Collection | None = None,
+        retrieval_mode: RetrievalMode = "hybrid",
     ) -> None:
         self.collection = collection
         self.source = source
         self.top_k = top_k
         self.claim_collection = claim_collection
+        self.retrieval_mode = retrieval_mode
 
     @property
     def tool_descriptor(self) -> dict[str, Any]:
@@ -43,14 +46,21 @@ class SourceAgent:
     def search(self, query: str, realm_id: str, access_principals: list[str]) -> list[dict]:
         if not access_principals:
             raise ValueError("At least one access principal is required")
+        pipeline = {
+            "hybrid": self._hybrid_pipeline,
+            "vector": self._vector_pipeline,
+            "lexical": self._lexical_pipeline,
+        }[self.retrieval_mode]
         try:
-            rows = list(self.collection.aggregate(
-                self._hybrid_pipeline(query, realm_id, access_principals)
-            ))
+            rows = list(self.collection.aggregate(pipeline(query, realm_id, access_principals)))
         except OperationFailure as exc:
             detail = str(exc).lower()
             unavailable = ("not ready", "not found", "not available")
-            if "index" in detail and any(marker in detail for marker in unavailable):
+            if (
+                self.retrieval_mode == "hybrid"
+                and "index" in detail
+                and any(marker in detail for marker in unavailable)
+            ):
                 try:
                     rows = list(self.collection.aggregate(
                         self._vector_pipeline(query, realm_id, access_principals)
@@ -94,6 +104,37 @@ class SourceAgent:
                 "filter": {"$and": self._scope(realm_id, access_principals)},
             }},
             {"$project": self._projection({"$meta": "vectorSearchScore"})},
+            {"$set": {"metadata.retrieval_reason": "vector_only_search"}},
+        ]
+
+    def _lexical_pipeline(
+        self, query: str, realm_id: str, access_principals: list[str],
+    ) -> list[dict]:
+        return [
+            {"$search": {
+                "index": SOURCE_LEXICAL_INDEX,
+                "compound": {
+                    "must": [{"text": {
+                        "query": query,
+                        "path": ["title", "content", "artifact_id"],
+                    }}],
+                    "filter": [
+                        {"equals": {"path": "realm_id", "value": realm_id}},
+                        {"in": {"path": "access_principals", "value": access_principals}},
+                    ],
+                },
+            }},
+            {"$limit": self.top_k},
+            {"$project": {
+                **self._projection(0.0),
+                "metadata": {"$ifNull": ["$metadata", {}]},
+                "_search_score": {"$meta": "searchScore"},
+            }},
+            {"$set": {
+                "vector_score": {"$min": [1.0, {"$divide": ["$_search_score", 10.0]}]},
+                "metadata.retrieval_reason": "lexical_only_search",
+            }},
+            {"$project": {"_search_score": 0}},
         ]
 
     def _hybrid_pipeline(

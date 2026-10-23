@@ -23,7 +23,7 @@ from core.schemas import (
     SourceName,
 )
 from core.security import validate_agent_scope
-from core.source_agents import SourceAgent
+from core.source_agents import RetrievalMode, SourceAgent
 
 LOGGER = get_logger("agent.nodes")
 
@@ -51,6 +51,7 @@ class AgentNodes:
                  conversation_summary_max_chars: int = 1500,
                  reconciliation_weights: ReconciliationWeights = DEFAULT_RECONCILIATION_WEIGHTS,
                  reranker: VoyageReranker | None = None,
+                 source_retrieval_mode: RetrievalMode = "hybrid",
                  ) -> None:
         self.db = db
         self.chat = chat
@@ -69,7 +70,8 @@ class AgentNodes:
         self.reranker = reranker
         self.agents = {
             source: SourceAgent(
-                db[source], source, source_top_k, db[CLAIM_ASSERTIONS_COLLECTION]
+                db[source], source, source_top_k, db[CLAIM_ASSERTIONS_COLLECTION],
+                source_retrieval_mode,
             )
             for source in ALL_SOURCES
         }

@@ -53,3 +53,42 @@ def test_evaluation_recognizes_safe_degraded_response():
     metrics = score_result(CASE, result, 1.0, 10.0)
     assert metrics["safe_degradation"] is True
     assert metrics["passed"] is False
+
+
+def test_phi_required_terms_pass_when_conflict_note_mentions_raw_payloads():
+    case = {
+        **CASE,
+        "id": "phi",
+        "claim": "phi_logging",
+        "preferred_value": "redacted",
+        "preferred_artifact": "policy",
+        "stale_artifacts": ["historical"],
+        "required_term_groups": [["redact"], ["raw payload"], ["historical"]],
+        "representatives": {"redacted": "policy", "raw_payloads": "historical"},
+    }
+    result = {
+        "answer": (
+            "PHI logging must redact sensitive fields [sharepoint:policy](https://demo/policy).\n\n"
+            "Conflict notes:\n"
+            "- `phi_logging` resolves to redacted [sharepoint:policy](https://demo/policy); "
+            "historical evidence represented raw payloads "
+            "[teams:historical](https://demo/historical)."
+        ),
+        "ranked_hits": [
+            {"source": "sharepoint", "artifact_id": "policy", "url": "https://demo/policy",
+             "claims": {"phi_logging": "redacted"}},
+            {"source": "teams", "artifact_id": "historical", "url": "https://demo/historical",
+             "claims": {"phi_logging": "raw_payloads"}},
+        ],
+        "contradictions": [{
+            "claim": "phi_logging", "preferred_value": "redacted",
+            "preferred_artifact": "policy",
+            "values": {"redacted": ["policy"], "raw_payloads": ["historical"]},
+            "representatives": {
+                "redacted": {"artifact_id": "policy"},
+                "raw_payloads": {"artifact_id": "historical"},
+            },
+        }],
+        "degraded": [],
+    }
+    assert score_result(case, result, 1.0, 10.0)["passed"] is True

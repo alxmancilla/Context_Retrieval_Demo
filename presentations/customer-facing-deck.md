@@ -65,7 +65,10 @@ MongoDB Atlas is used for more than document storage:
 
 ## 6. Why hybrid retrieval matters
 
-Semantic search helps with natural-language questions.
+Hybrid search is valuable because enterprise questions usually contain both meaning and exact
+language.
+
+Semantic search helps with natural-language questions and paraphrases.
 
 Lexical search helps with exact terms such as:
 
@@ -77,9 +80,27 @@ Lexical search helps with exact terms such as:
 
 The demo combines both using MongoDB `$rankFusion` so the system can find conceptually relevant and exact-match evidence.
 
+**Simple explanation:** semantic search finds what the user means; lexical search finds the exact words; hybrid search combines both.
+
+Demo option: run the same prompt in `vector`, `lexical`, and `hybrid` modes to show why the combined path is stronger than either path alone.
+
 ---
 
-## 7. Reranking with Voyage `rerank-3`
+## 7. Automated Embedding with Atlas
+
+Atlas Automated Embedding keeps document vectors current for the indexed `content` field.
+
+Customer benefits:
+
+- No separate embedding pipeline in the application.
+- No visible embedding arrays in source documents.
+- Cleaner connector and seed-data model.
+- Easier reuse across new demo domains.
+- Vector search stays close to the governed data and metadata filters.
+
+---
+
+## 8. Reranking with Voyage `rerank-3`
 
 After Atlas retrieves authorized candidates:
 
@@ -92,7 +113,7 @@ After Atlas retrieves authorized candidates:
 
 ---
 
-## 8. Governed answers, not just relevant answers
+## 9. Governed answers, not just relevant answers
 
 The system evaluates evidence using:
 
@@ -107,7 +128,7 @@ This helps the assistant prefer the current approved policy over older or lower-
 
 ---
 
-## 9. Permission-aware by design
+## 10. Permission-aware by design
 
 The demo applies enterprise security boundaries before generation:
 
@@ -119,7 +140,7 @@ The demo applies enterprise security boundaries before generation:
 
 ---
 
-## 10. Governed memory-v2
+## 11. Governed memory-v2
 
 The assistant only writes durable memory for appropriate content:
 
@@ -134,7 +155,7 @@ It rejects memory writes for normal enterprise Q&A, degraded responses, or low-c
 
 ---
 
-## 11. Suggested live demo flow
+## 12. Suggested live demo flow
 
 1. Ask a broad enterprise policy question.
 2. Show retrieval from all five source types.
@@ -145,7 +166,23 @@ It rejects memory writes for normal enterprise Q&A, degraded responses, or low-c
 
 ---
 
-## 12. Business value
+## 13. Reusable customer demo pattern
+
+The same architecture can be reused for other scenarios by changing the profile:
+
+- source labels and connectors
+- seed data and document types
+- authority hierarchy
+- contradiction claims
+- starter prompts
+- evaluation cases
+- customer talk track
+
+Example target domains: healthcare, finance, insurance, developer support, manufacturing quality, compliance, and internal IT operations.
+
+---
+
+## 14. Business value
 
 This pattern helps organizations:
 
@@ -158,7 +195,7 @@ This pattern helps organizations:
 
 ---
 
-## 13. Validation snapshot
+## 15. Validation snapshot
 
 Current demo state:
 
@@ -171,7 +208,7 @@ Note: deterministic live RAG gates are tracked separately from infrastructure he
 
 ---
 
-## 14. Closing message
+## 16. Closing message
 
 The value is not just faster answers.
 

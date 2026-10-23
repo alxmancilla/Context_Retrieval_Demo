@@ -2,6 +2,7 @@ from ui.presentation import (
     contradictions_markdown,
     evidence_markdown,
     intent_markdown,
+    retrieval_pipeline_markdown,
     source_result_markdown,
 )
 
@@ -11,6 +12,7 @@ def _hit() -> dict:
         "source": "github", "artifact_id": "github-auth", "title": "Auth | current",
         "url": "https://demo/auth", "vector_score": 0.91, "authority": 1.0,
         "rerank_score": 0.97, "freshness": 0.98, "truth_score": 0.95,
+        "metadata": {"retrieval_reason": "hybrid_rank_fusion"},
     }
 
 
@@ -56,3 +58,18 @@ def test_intent_and_source_activity_are_readable():
     assert "GitHub, Jira" in intent
     assert "current auth" in intent
     assert "similarity `0.910`" in source
+
+
+def test_retrieval_pipeline_inspector_explains_hybrid_search_and_models():
+    rendered = retrieval_pipeline_markdown(
+        {"github": [_hit()]}, [_hit()], [], [],
+        rerank_model="rerank-3",
+        embedding_profile="voyage-4:auto-embed:v1",
+        source_top_k=5,
+        retrieval_mode="hybrid",
+    )
+    assert "Atlas `autoEmbed`" in rendered
+    assert "$rankFusion" in rendered
+    assert "rerank-3" in rendered
+    assert "Retrieval mode" in rendered
+    assert "Hybrid `$rankFusion` hits: `1`" in rendered

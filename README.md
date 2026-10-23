@@ -15,6 +15,8 @@ freshness, and explicit contradictions before asking Azure Grove for a grounded,
   so source documents do **not** expose an `embedding` array field.
 - Each source combines ACL-filtered semantic and lexical retrieval with MongoDB
   `$rankFusion`, improving recall for both concepts and exact identifiers.
+- `SOURCE_RETRIEVAL_MODE=hybrid` is the default. Demo operators can temporarily switch to
+  `vector` or `lexical` to show what each retrieval path misses before returning to hybrid.
 - Voyage `rerank-3` globally reranks ACL-filtered candidates before deterministic
   reconciliation. Atlas vector similarity remains the fallback if reranking is unavailable.
 - Source truth score defaults to 55% semantic relevance, 30% authority, and 15%
@@ -42,6 +44,24 @@ See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the complete component diagram, ret
 sequence, MongoDB/Voyage rationale, resilience paths, and validation status.
 See [`SECURITY.md`](SECURITY.md) for provider data flows and production release gates.
 See [`OPERATIONS.md`](OPERATIONS.md) for readiness, SLO, restore, deletion, and incident procedures.
+See [`profiles/README.md`](profiles/README.md) for adapting the demo to other customer scenarios
+while reusing the same hybrid retrieval, reranking, governance, citation, and memory pipeline.
+
+## Reusable demo profile pattern
+
+The healthcare corpus is one profile on top of a reusable architecture. Other customer demos can
+keep the core pipeline unchanged and swap the profile assets:
+
+- source artifacts and metadata
+- source authority and freshness settings
+- normalized claim keys and contradiction examples
+- starter prompts and live demo script
+- deterministic eval cases
+- customer-facing presentation narrative
+
+The Chainlit **Retrieval pipeline** side-panel inspector makes the reusable value visible by showing
+Automated Embedding, hybrid `$rankFusion`, Voyage `rerank-3`, source counts, contradiction counts,
+fallbacks, and degraded markers for each turn.
 
 ## Contradiction behavior
 
@@ -130,6 +150,15 @@ exact terms, IDs, titles, and artifact identifiers. Source retrieval runs semant
 and lexical Search with tenant/ACL filters, then combines them with `$rankFusion`. Voyage
 `rerank-3` reranks only the already-authorized candidates returned by Atlas. The final governing
 answer is then selected by deterministic reconciliation, not by the embedding or reranker model.
+
+For customer demos, `SOURCE_RETRIEVAL_MODE` can be set to:
+
+- `hybrid` — default production-style path: vector + lexical + `$rankFusion`.
+- `vector` — semantic Vector Search only, useful for showing paraphrase recall.
+- `lexical` — keyword Search only, useful for showing exact-term and ID recall.
+
+Use comparison modes only for demonstration and troubleshooting; the recommended default remains
+`hybrid`.
 
 The default connection timeouts are tuned for this low-concurrency demo: Atlas server
 selection fails after 5 seconds, connection establishment after 10 seconds, and an

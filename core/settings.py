@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 from dotenv import load_dotenv
 
 from core.reconciliation import ReconciliationWeights
+from core.source_agents import RetrievalMode
 
 
 def _required(name: str) -> str:
@@ -84,6 +85,13 @@ def _nonempty(name: str, default: str) -> str:
     return value
 
 
+def _retrieval_mode() -> RetrievalMode:
+    mode = os.getenv("SOURCE_RETRIEVAL_MODE", "hybrid").strip().lower()
+    if mode not in {"hybrid", "vector", "lexical"}:
+        raise ValueError("SOURCE_RETRIEVAL_MODE must be 'hybrid', 'vector', or 'lexical'")
+    return mode  # type: ignore[return-value]
+
+
 def configured_reconciliation_weights() -> ReconciliationWeights:
     return ReconciliationWeights(
         vector=_bounded_float("RECONCILIATION_VECTOR_WEIGHT", 0.55, 0.0, 1.0),
@@ -110,6 +118,7 @@ class Settings:
     user_id: str
     agent_id: str
     source_top_k: int
+    source_retrieval_mode: RetrievalMode
     memory_top_k: int
     access_principals: tuple[str, ...]
     auth_mode: str
@@ -197,6 +206,7 @@ def get_settings() -> Settings:
         user_id=os.getenv("USER_ID", "demo-user"),
         agent_id=os.getenv("AGENT_ID", "cmm-context-assistant"),
         source_top_k=_bounded_int("SOURCE_TOP_K", 5, 1, 50),
+        source_retrieval_mode=_retrieval_mode(),
         memory_top_k=_bounded_int("MEMORY_TOP_K", 3, 1, 20),
         access_principals=_csv("ACCESS_PRINCIPALS", "role:platform-engineer"),
         auth_mode=auth_mode,
@@ -210,7 +220,7 @@ def get_settings() -> Settings:
         grove_timeout_seconds=_bounded_float("GROVE_TIMEOUT_SECONDS", 60.0, 1.0, 300.0),
         grove_max_retries=_bounded_int("GROVE_MAX_RETRIES", 2, 0, 5),
         voyage_api_key=os.getenv("VOYAGE_API_KEY") or None,
-        voyage_rerank_model=os.getenv("VOYAGE_RERANK_MODEL", "rerank-2.5"),
+        voyage_rerank_model=os.getenv("VOYAGE_RERANK_MODEL", "rerank-3"),
         voyage_rerank_timeout_seconds=_bounded_float(
             "VOYAGE_RERANK_TIMEOUT_SECONDS", 15.0, 1.0, 60.0
         ),

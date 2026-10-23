@@ -20,6 +20,23 @@ def test_binder_links_both_sides_of_a_contradiction():
     assert "https://demo/conf-old" in bound
 
 
+def test_binder_adds_verified_conflict_note_with_readable_claim_values():
+    hits = [_hit("policy", "sharepoint"), _hit("historical", "teams")]
+    conflict = {
+        "claim": "phi_logging",
+        "preferred_value": "redacted",
+        "preferred_artifact": "policy",
+        "representatives": {
+            "redacted": {"artifact_id": "policy"},
+            "raw_payloads": {"artifact_id": "historical"},
+        },
+    }
+    bound = bind_source_links("PHI logs must be redacted [sharepoint:policy].", hits, [conflict])
+    assert "Conflict notes" in bound
+    assert "raw payloads" in bound
+    assert "[teams:historical](https://demo/historical)" in bound
+
+
 def test_binder_limits_contradiction_sources_to_representatives_and_citations():
     hits = [
         _hit("policy", "sharepoint"), _hit("implementation", "github"),

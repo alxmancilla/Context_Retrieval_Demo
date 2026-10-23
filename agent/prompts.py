@@ -20,7 +20,7 @@ be treated as an enterprise source of truth."""
 
 
 def select_answer_evidence(
-    hits: list[dict], contradictions: list[dict], limit: int = 15,
+    hits: list[dict], contradictions: list[dict], limit: int = 8,
 ) -> list[dict]:
     required_ids: set[str] = set()
     for conflict in contradictions:

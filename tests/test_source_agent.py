@@ -50,6 +50,27 @@ def test_source_agent_uses_text_query_and_permission_filter():
     assert rows[0]["artifact_id"] == "github-test"
 
 
+def test_source_agent_supports_vector_only_demo_mode():
+    collection = FakeCollection()
+    agent = SourceAgent(collection, "github", top_k=5, retrieval_mode="vector")
+    agent.search("current auth", "realm-a", ["role:platform-engineer"])
+    vector = collection.pipeline[0]["$vectorSearch"]
+    assert vector["index"] == SOURCE_VECTOR_INDEX
+    assert collection.pipeline[-1]["$set"]["metadata.retrieval_reason"] == "vector_only_search"
+
+
+def test_source_agent_supports_lexical_only_demo_mode():
+    collection = FakeCollection()
+    agent = SourceAgent(collection, "github", top_k=5, retrieval_mode="lexical")
+    agent.search("RX-842", "realm-a", ["role:platform-engineer"])
+    lexical = collection.pipeline[0]["$search"]
+    assert lexical["index"] == SOURCE_LEXICAL_INDEX
+    assert lexical["compound"]["must"][0]["text"]["path"] == [
+        "title", "content", "artifact_id",
+    ]
+    assert collection.pipeline[-2]["$set"]["metadata.retrieval_reason"] == "lexical_only_search"
+
+
 def test_source_agent_rejects_an_empty_principal_set():
     with pytest.raises(ValueError, match="access principal"):
         SourceAgent(FakeCollection(), "github", 5).search("auth", "realm-a", [])

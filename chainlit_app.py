@@ -26,6 +26,7 @@ from ui.presentation import (
     evidence_markdown,
     intent_markdown,
     memories_markdown,
+    retrieval_pipeline_markdown,
     source_result_markdown,
 )
 
@@ -139,6 +140,7 @@ def _build_runtime(settings: Settings) -> AppRuntime:
             recent_context_max_chars=settings.recent_context_max_chars,
             conversation_summary_max_chars=settings.conversation_summary_max_chars,
             reconciliation_weights=settings.reconciliation_weights,
+            source_retrieval_mode=settings.source_retrieval_mode,
             reranker=create_voyage_reranker(
                 api_key=settings.voyage_api_key,
                 model=settings.voyage_rerank_model,
@@ -331,6 +333,20 @@ async def on_message(message: cl.Message) -> None:
         snapshot = await graph.aget_state(config)
         result = snapshot.values
         elements = [
+            cl.Text(
+                name="Retrieval pipeline",
+                content=retrieval_pipeline_markdown(
+                    result.get("source_results", {}),
+                    result.get("ranked_hits", []),
+                    result.get("contradictions", []),
+                    result.get("degraded", []),
+                    rerank_model=settings.voyage_rerank_model,
+                    embedding_profile=settings.memory_embedding_profile,
+                    source_top_k=settings.source_top_k,
+                    retrieval_mode=settings.source_retrieval_mode,
+                ),
+                display="side",
+            ),
             cl.Text(name="Evidence scores", content=evidence_markdown(result.get("ranked_hits", [])), display="side"),
             cl.Text(name="Contradictions", content=contradictions_markdown(result.get("contradictions", [])), display="side"),
             cl.Text(name="Semantic memory", content=memories_markdown(result.get("memories", [])), display="side"),

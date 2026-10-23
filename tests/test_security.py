@@ -114,6 +114,7 @@ def test_password_mode_rejects_weak_chainlit_signing_secret(monkeypatch):
     ("name", "value"),
     [
         ("SOURCE_TOP_K", "0"),
+        ("SOURCE_RETRIEVAL_MODE", "score"),
         ("MEMORY_TOP_K", "21"),
         ("MEMORY_MIN_IMPORTANCE", "1.1"),
         ("MEMORY_SIMILARITY_THRESHOLD", "0.49"),

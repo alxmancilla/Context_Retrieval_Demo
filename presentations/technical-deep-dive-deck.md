@@ -67,11 +67,25 @@ The demo uses 11 search/vector indexes:
 - 5 source lexical indexes named `content_lexical`.
 - 1 retained memory vector index named `memory_vector_retained`.
 
-The source vector indexes use Atlas Automated Embedding with Voyage `voyage-4` over the `content` path.
+The source vector indexes use Atlas Automated Embedding with Voyage `voyage-4` over the `content` path. Source documents stay focused on business content; generated vectors live in the managed Atlas Search index lifecycle rather than as application-managed document fields.
 
 ---
 
-## 6. Hybrid retrieval path
+## 6. Automated Embedding lifecycle
+
+Atlas Automated Embedding simplifies the reusable demo architecture:
+
+1. Connectors write normalized source documents with a `content` field.
+2. Atlas Search index definitions specify `autoEmbed` with Voyage `voyage-4`.
+3. Atlas maintains vectors for indexed content.
+4. The application queries by text instead of managing embedding arrays.
+5. Realm and ACL metadata remain available for pre-retrieval filters.
+
+This removes a separate embedding worker, vector synchronization process, and visible embedding fields from each domain profile.
+
+---
+
+## 7. Hybrid retrieval path
 
 For each selected source:
 
@@ -83,9 +97,22 @@ For each selected source:
 
 `$rankFusion` is used because vector and lexical scores are not naturally comparable.
 
+Technical benefit:
+
+- semantic retrieval improves recall for paraphrased concepts
+- lexical retrieval improves recall for exact policy names, IDs, and compliance terms
+- rank fusion combines both without pretending their raw scores have the same meaning
+- ACL filters apply before candidates are returned to the agent
+
+Demo comparison setting:
+
+- `SOURCE_RETRIEVAL_MODE=vector`
+- `SOURCE_RETRIEVAL_MODE=lexical`
+- `SOURCE_RETRIEVAL_MODE=hybrid`
+
 ---
 
-## 7. Global reranking
+## 8. Global reranking
 
 After source retrieval:
 
@@ -99,7 +126,21 @@ Reranking improves candidate ordering but does not replace governance.
 
 ---
 
-## 8. Deterministic reconciliation
+## 9. End-to-end retrieval signal flow
+
+The retrieval stack intentionally separates recall, precision, and trust:
+
+1. **Recall:** Atlas Vector Search and lexical Search retrieve authorized candidates.
+2. **Fusion:** MongoDB `$rankFusion` combines semantic and exact-match rankings.
+3. **Precision:** Voyage `rerank-3` compares the query with each candidate document.
+4. **Trust:** deterministic reconciliation applies authority, freshness, and governance policy.
+5. **Grounding:** the generation step receives only selected evidence and verified citation targets.
+
+This makes each stage inspectable and replaceable.
+
+---
+
+## 10. Deterministic reconciliation
 
 The reconciliation layer combines:
 
@@ -120,7 +161,7 @@ Weights are configurable and validated.
 
 ---
 
-## 9. Governance and claim boundaries
+## 11. Governance and claim boundaries
 
 Runtime truth metadata comes from protected governance records, not from untrusted generated text.
 
@@ -135,7 +176,7 @@ This allows the system to explain why one source wins over another.
 
 ---
 
-## 10. Citation integrity
+## 12. Citation integrity
 
 The answer pipeline binds citations to retrieved evidence.
 
@@ -150,7 +191,7 @@ The goal is to avoid unsupported or fabricated citations.
 
 ---
 
-## 11. Identity and access control
+## 13. Identity and access control
 
 The graph fails closed when required identity context is missing.
 
@@ -165,7 +206,7 @@ Unauthorized content is filtered before reranking and generation, reducing risk 
 
 ---
 
-## 12. Memory-v2 design
+## 14. Memory-v2 design
 
 Memory-v2 separates durable user memory from normal enterprise Q&A.
 
@@ -182,7 +223,7 @@ Rejected examples include normal Q&A, degraded turns, and content that should no
 
 ---
 
-## 13. Short-term conversation context
+## 15. Short-term conversation context
 
 The demo also manages recent-turn context.
 
@@ -199,7 +240,22 @@ Short-term context improves follow-up behavior without becoming authoritative kn
 
 ---
 
-## 14. Readiness and operational controls
+## 16. Reusable profile structure
+
+The runtime can be reused across customer demos by isolating domain-specific assets:
+
+- source definitions and connector adapters
+- seed corpus and source-specific metadata
+- authority weights and lifecycle policies
+- claim keys and contradiction scenarios
+- starter prompts and presentation talk track
+- evaluation cases and expected evidence
+
+The reusable core remains the same: authorized retrieval, hybrid fusion, reranking, deterministic governance, citation binding, and governed memory.
+
+---
+
+## 17. Readiness and operational controls
 
 Readiness includes checks for:
 
@@ -213,7 +269,7 @@ The demo also includes scripts for schema checks, ACL checks, retention checks, 
 
 ---
 
-## 15. Validation model
+## 18. Validation model
 
 Validation covers multiple layers:
 
@@ -229,7 +285,7 @@ Current known follow-up: deterministic live RAG gates need investigation for one
 
 ---
 
-## 16. Production design principles
+## 19. Production design principles
 
 The implementation demonstrates these production patterns:
 
@@ -243,7 +299,7 @@ The implementation demonstrates these production patterns:
 
 ---
 
-## 17. Recommended technical demo path
+## 20. Recommended technical demo path
 
 1. Show the architecture diagram.
 2. Walk through source retrieval and ACL filtering.
@@ -255,7 +311,7 @@ The implementation demonstrates these production patterns:
 
 ---
 
-## 18. Closing architecture takeaway
+## 21. Closing architecture takeaway
 
 The demo is not only a chatbot.
 

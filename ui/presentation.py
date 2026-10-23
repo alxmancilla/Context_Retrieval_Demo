@@ -88,6 +88,50 @@ def evidence_markdown(hits: list[dict]) -> str:
     return "\n".join(rows)
 
 
+def retrieval_pipeline_markdown(
+    source_results: dict[str, list[dict]], ranked_hits: list[dict],
+    contradictions: list[dict], degraded: list[str], *, rerank_model: str,
+    embedding_profile: str, source_top_k: int, retrieval_mode: str = "hybrid",
+) -> str:
+    source_counts = {
+        SOURCE_LABELS.get(source, source.title()): len(hits)
+        for source, hits in sorted(source_results.items())
+    }
+    retrieved = sum(source_counts.values())
+    reranked = sum(1 for hit in ranked_hits if hit.get("rerank_score") is not None)
+    hybrid = sum(
+        1 for hits in source_results.values() for hit in hits
+        if hit.get("metadata", {}).get("retrieval_reason") == "hybrid_rank_fusion"
+    )
+    fallback = sum(
+        1 for hits in source_results.values() for hit in hits
+        if hit.get("metadata", {}).get("retrieval_reason")
+        == "vector_only_lexical_index_unavailable"
+    )
+    rows = [
+        "## Retrieval pipeline",
+        "| Stage | What happened |",
+        "|---|---|",
+        f"| Automated Embedding | Atlas `autoEmbed` profile `{embedding_profile}` indexes source `content`; documents do not carry visible embedding arrays. |",
+        f"| Retrieval mode | `{retrieval_mode}`. Use `hybrid` for the production-style path, or `vector` / `lexical` for demo comparisons. |",
+        f"| Candidate generation | Atlas Vector Search + lexical Search + ACL filters + `$rankFusion` when hybrid is enabled; target top-k per source is `{source_top_k}`. |",
+        f"| Source fan-out | Retrieved `{retrieved}` authorized candidate(s) across `{len(source_counts)}` source(s). |",
+        f"| Reranking | Voyage `{rerank_model}` scored `{reranked}` candidate(s); Atlas vector score remains the fallback. |",
+        f"| Reconciliation | Ranked `{len(ranked_hits)}` evidence item(s) and found `{len(contradictions)}` contradiction group(s). |",
+    ]
+    if source_counts:
+        rows.extend(["", "### Source counts"])
+        rows.extend(f"- **{source}:** {count}" for source, count in source_counts.items())
+    rows.extend([
+        "",
+        "### Retrieval signals",
+        f"- Hybrid `$rankFusion` hits: `{hybrid}`",
+        f"- Vector-only fallback hits: `{fallback}`",
+        f"- Degraded markers: `{', '.join(degraded) if degraded else 'none'}`",
+    ])
+    return "\n".join(rows)
+
+
 def contradictions_markdown(conflicts: list[dict]) -> str:
     if not conflicts:
         return "No normalized claim contradictions were detected in retrieved evidence."

@@ -35,12 +35,13 @@ flowchart LR
     subgraph ATLAS[MongoDB Atlas — Context and State Plane]
         direction TB
         SRC[(Five Source Collections<br/>Flexible Artifact Documents)]
-        IDX[Hybrid Search<br/>Vector + Lexical + ACL + Rank Fusion]
+        EMB[Atlas Automated Embedding<br/>voyage-4 on content]
+        IDX[Hybrid Search<br/>Vector + Lexical + ACL + $rankFusion]
         REG[(Protected Governance<br/>Authority + Lifecycle Policy)]
         CLM[(Indexed Claim Assertions<br/>ACL-scoped Alternatives)]
         SM[(Governed Memory Nodes<br/>Type + Validity + Provenance + TTL)]
         CP[(LangGraph Checkpoints<br/>Thread State + TTL)]
-        SRC --- IDX
+        SRC --> EMB --> IDX
     end
 
     GH & CF & JI & SP & TM --> IDX
@@ -64,17 +65,22 @@ flowchart LR
 2. **Agent orchestration:** After identity and intent validation, LangGraph retrieves bounded
    recent turns, governed durable memory, and all selected sources in the same parallel superstep.
 3. **Source-aware retrieval:** Thin agents represent GitHub, Confluence, Jira,
-   SharePoint, and Teams. Atlas applies realm and ACL filters independently to lexical and vector
-   retrieval, then `$rankFusion` combines both rankings.
-4. **Global reranking:** Voyage `rerank-3` compares every retrieved candidate directly
-   with the rewritten query. Results remain aligned to their original Atlas documents.
-5. **Deterministic reasoning:** Configurable relevance, authority, and freshness weights rank
+   SharePoint, and Teams. Atlas Automated Embedding keeps `voyage-4` vectors current for
+   the `content` field, while lexical Atlas Search indexes preserve exact terms, IDs, and
+   titles. Atlas applies realm and ACL filters before either retrieval path returns results.
+4. **Hybrid fusion:** MongoDB `$rankFusion` combines the semantic and lexical rankings. This
+   demonstrates why hybrid search is useful: vector retrieval catches paraphrased concepts,
+   while lexical retrieval catches exact policy names, identifiers, and compliance terms.
+5. **Global reranking:** Voyage `rerank-3` compares every authorized candidate directly
+   with the rewritten query. Results remain aligned to their original Atlas documents, and the
+   reranker cannot introduce unauthorized evidence.
+6. **Deterministic reasoning:** Configurable relevance, authority, and freshness weights rank
    evidence. Runtime truth metadata comes only from protected governance records; indexed claim
    assertions provide ACL-scoped contradiction representatives.
-6. **Grounded generation:** Azure Grove writes the response after reconciliation.
+7. **Grounded generation:** Azure Grove writes the response after reconciliation.
    Model-supplied citation URLs are removed; binding accepts only artifacts present in the
    retrieved evidence set. Production buffers draft tokens until this verification completes.
-7. **State and operations:** LangGraph checkpoints retain execution state and recent turns;
+8. **State and operations:** LangGraph checkpoints retain execution state and recent turns;
    governed memory nodes retain only selected cross-session continuity. Older turns are compacted,
    while TTL and unique indexes enforce lifecycle and identity. Structured logs and `/ready`
    expose content-free memory outcomes, context volume, versions, and degraded capabilities.
@@ -82,7 +88,8 @@ flowchart LR
 ## Retrieval and ranking sequence
 
 1. Atlas Automated Embedding uses `voyage-4` to maintain vectors for the `content` path inside
-   Atlas Search indexes. The application documents do not contain visible `embedding` arrays.
+   Atlas Search indexes. The application documents do not contain visible `embedding` arrays,
+   so connectors and seed profiles can focus on business content instead of embedding plumbing.
    Explicit lexical indexes cover titles, content, and artifact identifiers.
 2. Each source executes ACL-filtered semantic and lexical pipelines. MongoDB `$rankFusion`
    combines them, and indexed claim records supply up to three alternate-value representatives.
@@ -98,6 +105,12 @@ flowchart LR
 
 - **Thin source agents:** Connectors retrieve evidence but do not independently decide truth.
 - **Parallel retrieval:** Independent source searches run concurrently to reduce latency.
+- **Managed embeddings:** Atlas Automated Embedding owns vector creation and synchronization for
+  source content, reducing reusable-demo setup to documents, indexes, and source metadata.
+- **Explainable hybrid search:** `$rankFusion` keeps semantic and lexical scoring separate, then
+  combines rankings so exact terms and paraphrased concepts can both influence candidate recall.
+- **Comparison modes:** `SOURCE_RETRIEVAL_MODE` can temporarily run `vector` or `lexical` only,
+  making the value of the default `hybrid` path visible in customer demos.
 - **Global semantic reranking:** Voyage compares every candidate directly with the user query;
   Atlas vector similarity remains available as a resilient fallback.
 - **No reranker data loss:** Every returned index and score is validated, and incomplete or
@@ -118,6 +131,25 @@ flowchart LR
 - **Graceful degradation:** Failed sources are reported without creating an ungrounded answer.
 - **Replaceable connectors:** APIs or MCP servers can replace synthetic source adapters while
   preserving the normalized artifact contract.
+- **Reusable demo profiles:** New domains can reuse the same retrieval, governance, memory, and
+  citation pipeline by swapping source seed data, authority rules, claim types, prompts, and evals.
+
+## Reusable demo pattern
+
+The implementation is intentionally structured as a repeatable pattern rather than a one-off
+healthcare scenario. A new customer or industry profile can reuse the same runtime by changing:
+
+- **Source profile:** collection names, connector adapters, source labels, and source metadata.
+- **Authority profile:** source authority weights, lifecycle rules, freshness half-lives, and
+  governance overrides.
+- **Claim profile:** the normalized claim keys that should be checked for contradictions.
+- **Prompt profile:** customer-relevant starter questions and talk tracks.
+- **Evaluation profile:** canonical winner, required terminology, citation, freshness, and latency
+  checks for the target use case.
+
+This keeps the core architecture stable while making the content, policy hierarchy, and narrative
+portable across domains such as healthcare, financial services, insurance, developer support,
+manufacturing quality, legal/compliance, or internal IT operations.
 
 ## Why MongoDB is a strong fit
 
@@ -220,8 +252,9 @@ visible in the evidence inspector for auditability.
   suggestion, grounds both representatives, and produces four verified source entries.
 - Generic `[source:artifact_id]` output is deterministically rebound to the verified artifact's
   actual source. Model-supplied markdown URLs are removed before rebinding.
-- All **4/4 live RAG evaluation cases pass**, including canonical winner, representative,
-  stale-evidence, terminology, citation-precision, source-concision, and latency checks.
+- The live RAG evaluation harness remains part of the release gate. The latest post-reseed
+  follow-up tracks two metric-gate regressions: one latency-budget miss and one required-term
+  coverage miss; retrieval, citations, and degradation checks remained healthy.
 - All **4/4 assurance retrieval cases pass** for key rotation, dead-letter replay, cache
   invalidation, and break-glass logging.
 - A 15-operation, five-worker Atlas retrieval smoke completed with zero errors and no content
