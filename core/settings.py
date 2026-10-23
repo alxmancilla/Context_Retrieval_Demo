@@ -1,12 +1,15 @@
 import os
 from dataclasses import dataclass
 from functools import lru_cache
+from typing import Literal
 from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 
 from core.reconciliation import ReconciliationWeights
 from core.source_agents import RetrievalMode
+
+ChatProviderName = Literal["grove", "openai"]
 
 
 def _required(name: str) -> str:
@@ -92,6 +95,13 @@ def _retrieval_mode() -> RetrievalMode:
     return mode  # type: ignore[return-value]
 
 
+def _chat_provider() -> ChatProviderName:
+    provider = os.getenv("CHAT_PROVIDER", "grove").strip().lower()
+    if provider not in {"grove", "openai"}:
+        raise ValueError("CHAT_PROVIDER must be 'grove' or 'openai'")
+    return provider  # type: ignore[return-value]
+
+
 def configured_reconciliation_weights() -> ReconciliationWeights:
     return ReconciliationWeights(
         vector=_bounded_float("RECONCILIATION_VECTOR_WEIGHT", 0.55, 0.0, 1.0),
@@ -111,9 +121,13 @@ class Settings:
     mongodb_min_pool_size: int
     mongodb_wait_queue_timeout_ms: int
     mongodb_validation_action: str
+    chat_provider: ChatProviderName
     grove_api_key: str
     grove_base_url: str
     grove_model: str
+    openai_api_key: str
+    openai_base_url: str
+    openai_model: str
     realm_id: str
     user_id: str
     agent_id: str
@@ -131,6 +145,8 @@ class Settings:
     app_env: str
     grove_timeout_seconds: float
     grove_max_retries: int
+    openai_timeout_seconds: float
+    openai_max_retries: int
     voyage_api_key: str | None
     voyage_rerank_model: str
     voyage_rerank_timeout_seconds: float
@@ -176,6 +192,11 @@ def get_settings() -> Settings:
     ).strip().lower()
     if validation_action not in {"warn", "error"}:
         raise ValueError("MONGODB_VALIDATION_ACTION must be 'warn' or 'error'")
+    chat_provider = _chat_provider()
+    grove_api_key = _required("GROVE_API_KEY") if chat_provider == "grove" else os.getenv("GROVE_API_KEY", "")
+    openai_api_key = (
+        _required("OPENAI_API_KEY") if chat_provider == "openai" else os.getenv("OPENAI_API_KEY", "")
+    )
     return Settings(
         mongodb_uri=_required("MONGODB_URI"),
         mongodb_db=os.getenv("MONGODB_DB", "cmm_context_demo"),
@@ -194,7 +215,8 @@ def get_settings() -> Settings:
             "MONGODB_WAIT_QUEUE_TIMEOUT_MS", 5000, 100, 120_000
         ),
         mongodb_validation_action=validation_action,
-        grove_api_key=_required("GROVE_API_KEY"),
+        chat_provider=chat_provider,
+        grove_api_key=grove_api_key,
         grove_base_url=_provider_url(
             "GROVE_BASE_URL",
             "https://grove-gateway-prod.azure-api.net/"
@@ -202,6 +224,9 @@ def get_settings() -> Settings:
             app_env,
         ),
         grove_model=os.getenv("GROVE_MODEL", "gpt-5.6-sol"),
+        openai_api_key=openai_api_key,
+        openai_base_url=_provider_url("OPENAI_BASE_URL", "https://api.openai.com/v1", app_env),
+        openai_model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
         realm_id=os.getenv("REALM_ID", "cmm-demo"),
         user_id=os.getenv("USER_ID", "demo-user"),
         agent_id=os.getenv("AGENT_ID", "cmm-context-assistant"),
@@ -219,6 +244,8 @@ def get_settings() -> Settings:
         app_env=app_env,
         grove_timeout_seconds=_bounded_float("GROVE_TIMEOUT_SECONDS", 60.0, 1.0, 300.0),
         grove_max_retries=_bounded_int("GROVE_MAX_RETRIES", 2, 0, 5),
+        openai_timeout_seconds=_bounded_float("OPENAI_TIMEOUT_SECONDS", 60.0, 1.0, 300.0),
+        openai_max_retries=_bounded_int("OPENAI_MAX_RETRIES", 2, 0, 5),
         voyage_api_key=os.getenv("VOYAGE_API_KEY") or None,
         voyage_rerank_model=os.getenv("VOYAGE_RERANK_MODEL", "rerank-3"),
         voyage_rerank_timeout_seconds=_bounded_float(

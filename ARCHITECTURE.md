@@ -50,7 +50,7 @@ flowchart LR
     REC <--> REG
     GH & CF & JI & SP & TM <--> CLM
     LG <--> CP
-    GEN <--> GROVE[Azure Grove<br/>GPT-5.6-sol]
+    GEN <--> CHAT[Chat Provider<br/>Grove or OpenAI]
     RR <--> VOYAGE[Voyage AI<br/>rerank-3]
     RR -. timeout or error .-> FALLBACK[Atlas Vector Score Fallback]
     FALLBACK --> REC
@@ -77,7 +77,7 @@ flowchart LR
 6. **Deterministic reasoning:** Configurable relevance, authority, and freshness weights rank
    evidence. Runtime truth metadata comes only from protected governance records; indexed claim
    assertions provide ACL-scoped contradiction representatives.
-7. **Grounded generation:** Azure Grove writes the response after reconciliation.
+7. **Grounded generation:** The configured chat provider writes the response after reconciliation.
    Model-supplied citation URLs are removed; binding accepts only artifacts present in the
    retrieved evidence set. Production buffers draft tokens until this verification completes.
 8. **State and operations:** LangGraph checkpoints retain execution state and recent turns;
@@ -97,7 +97,7 @@ flowchart LR
    all evidence needed for contradiction analysis.
 4. The truth score combines 55% semantic relevance, 30% source authority, and 15%
    freshness by default. These weights are validated and configurable.
-5. Deterministic claim comparison selects preferred evidence before Grove writes prose.
+5. Deterministic claim comparison selects preferred evidence before the chat provider writes prose.
    Each decision records one representative per value, its timestamp and lifecycle status,
    and the score margin over the best competing value.
 
@@ -119,7 +119,8 @@ flowchart LR
 - **Governed evidence classes:** Policy, implementation, runbook, and historical incident
   records carry explicit lifecycle status and optional authority overrides.
 - **Deterministic scoring:** Conflict resolution remains explainable, configurable, and testable.
-- **LLM after retrieval:** Grove generates grounded prose but does not establish authority.
+- **LLM after retrieval:** The configured chat provider generates grounded prose but does not
+  establish authority.
 - **Verified citations:** References are bound to actual retrieved documents.
 - **Trusted governance boundary:** Connector-owned metadata cannot elevate reconciliation
   authority; protected policy records are overlaid before scoring.
@@ -246,7 +247,7 @@ visible in the evidence inspector for auditability.
 ## Validation status
 
 - Live Voyage `rerank-3` API contract test passes.
-- The end-to-end Atlas → Voyage → reconciliation → Grove flow reranked 26 candidates across
+- The end-to-end Atlas → Voyage → reconciliation → chat-provider flow reranked 26 candidates across
   all five source collections without capability degradation.
 - The PHI policy case selects the effective SharePoint policy over a historical Teams incident
   suggestion, grounds both representatives, and produces four verified source entries.

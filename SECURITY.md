@@ -13,7 +13,7 @@ provider, and trusted mapping of identity claims to `realm_id`, `user_id`, and p
 |---|---|---|
 | MongoDB Atlas Automated Embedding | Indexed artifact/memory `content` text and search query text are processed by the configured Voyage model integration. Vectors are managed in Atlas Search indexes, not exposed as document fields. | Confirm supported region, preview-feature policy, contractual terms, retention, residency, encryption, and regulated-data eligibility. |
 | Application-side Voyage reranking | Rewritten query and ACL-filtered candidate titles/content are sent to Voyage. | Confirm DPA/BAA requirements, retention and training policy, region, egress controls, and incident process. |
-| Azure Grove generation | User question, selected evidence, contradiction decisions, and redacted conversational memory are sent to Grove. | Confirm approved model deployment, DPA/BAA, retention and training policy, content filtering, regional routing, and auditability. |
+| Configured chat provider generation | User question, selected evidence, contradiction decisions, and redacted conversational memory are sent to Azure Grove or standard OpenAI, depending on `CHAT_PROVIDER`. | Confirm approved model deployment, DPA/BAA, retention and training policy, content filtering, regional routing, and auditability. |
 | Chainlit browser session | Draft answer tokens may be displayed locally; production buffers them until deterministic citation binding completes. | Use exact HTTPS origins, enterprise SSO, secure cookies, reverse-proxy hardening, and CSP/TLS controls. |
 
 Atlas lexical and vector filters enforce `realm_id` and `access_principals` before rank fusion.

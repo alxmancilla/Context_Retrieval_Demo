@@ -15,7 +15,7 @@ from agent.graph import build_graph
 from agent.nodes import AgentNodes
 from core.observability import configure_logging, get_logger, log_failure
 from core.pool_metrics import PoolMetrics
-from core.providers.chat import GroveChatProvider
+from core.providers.chat import create_chat_provider
 from core.providers.rerank import create_voyage_reranker
 from core.security import credentials_match, resolve_access_context, resolve_oauth_access_context
 from core.settings import Settings, configured_auth_mode, get_settings
@@ -121,13 +121,7 @@ def _build_runtime(settings: Settings) -> AppRuntime:
         pool_metrics=pool_metrics,
     )
     try:
-        chat = GroveChatProvider(
-            api_key=settings.grove_api_key,
-            base_url=settings.grove_base_url,
-            model=settings.grove_model,
-            timeout_seconds=settings.grove_timeout_seconds,
-            max_retries=settings.grove_max_retries,
-        )
+        chat = create_chat_provider(settings)
         nodes = AgentNodes(
             db, chat, settings.source_top_k, settings.memory_top_k,
             settings.memory_retention_days, settings.memory_max_per_user,
@@ -262,7 +256,7 @@ async def on_chat_start() -> None:
             correlation_id=None, node="session_init",
         )
         await cl.Message(
-            content="Unable to initialize Atlas or Grove. Check the local configuration and restart."
+            content="Unable to initialize Atlas or chat provider. Check the local configuration and restart."
         ).send()
 
 

@@ -8,7 +8,7 @@ from agent.graph import build_graph
 from agent.nodes import AgentNodes
 from core.memory import SemanticMemory
 from core.observability import configure_logging
-from core.providers.chat import GroveChatProvider
+from core.providers.chat import create_chat_provider
 from core.providers.rerank import create_voyage_reranker
 from core.settings import get_settings
 from core.threads import register_thread, scoped_thread_id
@@ -70,11 +70,7 @@ def main() -> None:
             deleted = SemanticMemory(db.memories).delete_user(settings.realm_id, user_id)
             print(f"Tombstoned {deleted} semantic memories for user {user_id}.")
             return
-        chat = GroveChatProvider(
-            api_key=settings.grove_api_key, base_url=settings.grove_base_url,
-            model=settings.grove_model, timeout_seconds=settings.grove_timeout_seconds,
-            max_retries=settings.grove_max_retries,
-        )
+        chat = create_chat_provider(settings)
         nodes = AgentNodes(
             db, chat, settings.source_top_k, settings.memory_top_k,
             settings.memory_retention_days, settings.memory_max_per_user,

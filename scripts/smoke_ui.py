@@ -9,7 +9,7 @@ from langgraph.checkpoint.mongodb import MongoDBSaver
 from agent.graph import build_graph
 from agent.nodes import AgentNodes
 from core.observability import configure_logging
-from core.providers.chat import GroveChatProvider
+from core.providers.chat import create_chat_provider
 from core.providers.rerank import create_voyage_reranker
 from core.settings import get_settings
 from db.bootstrap import connect
@@ -29,13 +29,7 @@ async def main() -> None:
         wait_queue_timeout_ms=settings.mongodb_wait_queue_timeout_ms,
     )
     try:
-        chat = GroveChatProvider(
-            api_key=settings.grove_api_key,
-            base_url=settings.grove_base_url,
-            model=settings.grove_model,
-            timeout_seconds=settings.grove_timeout_seconds,
-            max_retries=settings.grove_max_retries,
-        )
+        chat = create_chat_provider(settings)
         graph = build_graph(
             AgentNodes(
                 db, chat, settings.source_top_k, settings.memory_top_k,

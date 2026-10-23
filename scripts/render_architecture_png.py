@@ -88,7 +88,7 @@ def render() -> None:
     box(680, 645, 230, 90, "Voyage AI", ["rerank-3 global"], "#fff7e6", ORANGE)
     box(385, 635, 250, 110, "Reconciliation", ["authority + claims", "conflict winners"], "#e8f5ee", GREEN)
     box(395, 790, 270, 80, "Conflict Notes", ["readable eval terms"], "#e8f5ee", GREEN)
-    box(105, 645, 210, 90, "Grove", ["grounded answer"], "#fff7e6", ORANGE)
+    box(105, 645, 210, 90, "Chat Provider", ["Grove or OpenAI"], "#fff7e6", ORANGE)
     arrow([(1025, 645), (910, 690)])
     arrow([(680, 690), (625, 690)])
     arrow([(510, 745), (510, 790)])

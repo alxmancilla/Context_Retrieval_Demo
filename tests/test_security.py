@@ -126,6 +126,8 @@ def test_password_mode_rejects_weak_chainlit_signing_secret(monkeypatch):
         ("MONGODB_SOCKET_TIMEOUT_MS", "999"),
         ("MONGODB_MAX_POOL_SIZE", "0"),
         ("MONGODB_WAIT_QUEUE_TIMEOUT_MS", "99"),
+        ("OPENAI_TIMEOUT_SECONDS", "0"),
+        ("OPENAI_MAX_RETRIES", "6"),
     ],
 )
 def test_runtime_rejects_unbounded_retrieval_and_timeout_values(monkeypatch, name, value):
@@ -144,6 +146,39 @@ def test_production_rejects_non_https_grove_endpoint(monkeypatch):
     monkeypatch.setenv("GROVE_BASE_URL", "http://grove.example/v1")
     get_settings.cache_clear()
     with pytest.raises(ValueError, match="GROVE_BASE_URL must use HTTPS"):
+        get_settings()
+    get_settings.cache_clear()
+
+
+def test_runtime_rejects_unknown_chat_provider(monkeypatch):
+    monkeypatch.setenv("CHAT_PROVIDER", "anthropic")
+    get_settings.cache_clear()
+    with pytest.raises(ValueError, match="CHAT_PROVIDER"):
+        get_settings()
+    get_settings.cache_clear()
+
+
+def test_openai_chat_provider_does_not_require_grove_key(monkeypatch):
+    monkeypatch.setenv("CHAT_PROVIDER", "openai")
+    monkeypatch.setenv("OPENAI_API_KEY", "redacted")
+    monkeypatch.setenv("GROVE_API_KEY", "")
+    get_settings.cache_clear()
+    settings = get_settings()
+    assert settings.chat_provider == "openai"
+    assert settings.openai_api_key == "redacted"
+    get_settings.cache_clear()
+
+
+def test_production_rejects_non_https_openai_endpoint(monkeypatch):
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("AUTH_MODE", "oauth")
+    monkeypatch.setenv("CHAINLIT_AUTH_SECRET", "a-secure-random-signing-secret-value")
+    monkeypatch.setenv("OAUTH_ALLOWED_PROVIDERS", "azure-ad")
+    monkeypatch.setenv("CHAT_PROVIDER", "openai")
+    monkeypatch.setenv("OPENAI_API_KEY", "redacted")
+    monkeypatch.setenv("OPENAI_BASE_URL", "http://api.openai.example/v1")
+    get_settings.cache_clear()
+    with pytest.raises(ValueError, match="OPENAI_BASE_URL must use HTTPS"):
         get_settings()
     get_settings.cache_clear()
 

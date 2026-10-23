@@ -1,4 +1,5 @@
 import json
+from collections.abc import Iterator
 from typing import TypeVar
 
 from openai import OpenAI
@@ -33,7 +34,7 @@ class GroveChatProvider:
         )
         return response.choices[0].message.content or ""
 
-    def stream(self, system: str, user: str):
+    def stream(self, system: str, user: str) -> Iterator[str]:
         events = self.client.chat.completions.create(
             model=self.model,
             messages=[

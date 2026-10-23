@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="800" viewBox="0 0 1280 800" role="img" aria-labelledby="title desc">
   <title id="title">AI Context Platform solution architecture</title>
-  <desc id="desc">Flow from Chainlit through LangGraph, Atlas hybrid retrieval with comparison modes, Voyage reranking, reconciliation, deterministic conflict notes, Grove generation, citations, checkpoints, and memory.</desc>
+  <desc id="desc">Flow from Chainlit through LangGraph, Atlas hybrid retrieval with comparison modes, Voyage reranking, reconciliation, deterministic conflict notes, chat-provider generation, citations, checkpoints, and memory.</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#116149"/></marker>
     <style>
@@ -29,7 +29,7 @@
   <rect class="external" x="540" y="508" width="188" height="80" rx="14"/><text class="text label" x="580" y="540">Voyage AI</text><text class="text small" x="574" y="564">rerank-3 global</text>
   <rect class="node" x="300" y="508" width="190" height="96" rx="14"/><text class="text label" x="322" y="540">Reconciliation</text><text class="text small" x="326" y="564">authority + claims</text><text class="text small" x="328" y="584">conflict winners</text>
   <rect class="node" x="296" y="638" width="210" height="70" rx="14"/><text class="text label" x="337" y="667">Conflict Notes</text><text class="text small" x="323" y="690">readable eval terms</text>
-  <rect class="external" x="80" y="520" width="170" height="80" rx="14"/><text class="text label" x="122" y="552">Grove</text><text class="text small" x="103" y="576">grounded answer</text>
+  <rect class="external" x="80" y="520" width="170" height="80" rx="14"/><text class="text label" x="104" y="552">Chat Provider</text><text class="text small" x="95" y="576">Grove or OpenAI</text>
   <path class="line" d="M835 548 H728"/><path class="line" d="M540 548 H490"/><path class="line" d="M395 604 V638"/><path class="line" d="M300 556 H250"/>
   <path class="line" d="M80 560 H50 V190 H70"/>
   <rect class="store" x="70" y="638" width="190" height="58" rx="12"/><text class="text label" x="101" y="673">/ready checks</text>

@@ -1,11 +1,15 @@
 from datetime import UTC, datetime
 from types import SimpleNamespace
+from typing import Any, cast
 
 from langgraph.graph import END, START, StateGraph
 
 from agent.nodes import AgentNodes
+from core.providers.chat import create_chat_provider
 from core.providers.chat import grove as grove_module
+from core.providers.chat import openai as openai_module
 from core.providers.chat.grove import GroveChatProvider
+from core.providers.chat.openai import OpenAIChatProvider
 from core.schemas import AgentState
 
 
@@ -37,10 +41,59 @@ def test_grove_provider_applies_explicit_timeout_and_retries(monkeypatch):
     assert captured["max_retries"] == 3
 
 
+def test_openai_provider_uses_standard_bearer_client_options(monkeypatch):
+    captured = {}
+
+    def fake_openai(**kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace()
+
+    monkeypatch.setattr(openai_module, "OpenAI", fake_openai)
+    provider = OpenAIChatProvider(
+        api_key="redacted", base_url="https://api.openai.com/v1/", model="gpt-test",
+        timeout_seconds=7.5, max_retries=1,
+    )
+    assert provider.model == "gpt-test"
+    assert captured["api_key"] == "redacted"
+    assert captured["base_url"] == "https://api.openai.com/v1"
+    assert captured["timeout"] == 7.5
+    assert captured["max_retries"] == 1
+    assert "default_headers" not in captured
+
+
+def test_create_chat_provider_selects_openai(monkeypatch):
+    captured = {}
+
+    def fake_openai(**kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace()
+
+    monkeypatch.setattr(openai_module, "OpenAI", fake_openai)
+    provider = create_chat_provider(SimpleNamespace(
+        chat_provider="openai",
+        openai_api_key="redacted",
+        openai_base_url="https://api.openai.com/v1",
+        openai_model="gpt-test",
+        openai_timeout_seconds=10.0,
+        openai_max_retries=2,
+    ))
+    assert isinstance(provider, OpenAIChatProvider)
+    assert captured["api_key"] == "redacted"
+
+
 def test_grove_provider_yields_non_empty_deltas():
     provider = object.__new__(GroveChatProvider)
     provider.model = "test-model"
-    provider.client = SimpleNamespace(chat=SimpleNamespace(completions=FakeCompletions()))
+    provider.client = cast(Any, SimpleNamespace(chat=SimpleNamespace(completions=FakeCompletions())))
+    assert list(provider.stream("system", "user")) == [
+        "OAuth ", "2 [github:gh-auth]"
+    ]
+
+
+def test_openai_provider_yields_non_empty_deltas():
+    provider = object.__new__(OpenAIChatProvider)
+    provider.model = "test-model"
+    provider.client = cast(Any, SimpleNamespace(chat=SimpleNamespace(completions=FakeCompletions())))
     assert list(provider.stream("system", "user")) == [
         "OAuth ", "2 [github:gh-auth]"
     ]
@@ -63,7 +116,7 @@ def test_generate_emits_custom_tokens_and_finalizes_citations():
         "authority": 1.0, "freshness": 1.0, "truth_score": 0.945,
         "claims": {}, "metadata": {},
     }
-    events = list(graph.stream(
+    events: list[tuple[str, Any]] = list(graph.stream(
         {"query": "auth?", "ranked_hits": [hit], "contradictions": [], "memories": []},
         stream_mode=["updates", "custom"],
     ))

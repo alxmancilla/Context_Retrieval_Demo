@@ -3,7 +3,8 @@
 A source-aware, multi-agent RAG demo that simulates GitHub, Confluence, Jira,
 SharePoint, and Teams using MongoDB Atlas collections. A LangGraph coordinator
 fans out to thin source specialists, then centrally reconciles authority,
-freshness, and explicit contradictions before asking Azure Grove for a grounded, cited answer.
+freshness, and explicit contradictions before asking the configured chat provider for a grounded,
+cited answer.
 
 ## Key design choices
 
@@ -38,7 +39,7 @@ freshness, and explicit contradictions before asking Azure Grove for a grounded,
 ## Architecture
 
 `validated identity → intent parser → parallel recent/durable context + hybrid source agents →
-Voyage reranking → deterministic reconciliation → Grove grounded writer → selective memory → compaction`
+Voyage reranking → deterministic reconciliation → chat-provider grounded writer → selective memory → compaction`
 
 See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the complete component diagram, retrieval
 sequence, MongoDB/Voyage rationale, resilience paths, and validation status.
@@ -72,7 +73,7 @@ fallbacks, and degraded markers for each turn.
 - Artifact authority overrides let an effective policy outrank an implementation record while
   retaining source-level authority as the default.
 - The cross-value score margin makes the strength of the deterministic decision explicit.
-- Grove always receives each representative, including low-ranked historical evidence, so it
+- The configured chat provider receives each representative, including low-ranked historical evidence, so it
   can distinguish an old incident suggestion from an approved policy or established practice.
 - The Sources appendix is limited to cited, preferred, and representative artifacts instead of
   listing every corroborating document.
@@ -86,7 +87,7 @@ fallbacks, and degraded markers for each turn.
   They are configured in Atlas, not passed through this application's CLI.
 - A separate application-side Voyage API key for `rerank-3`. Set `VOYAGE_API_KEY`;
   Atlas does not expose its Automated Embedding credentials to the application.
-- An Azure Grove API key for `gpt-5.6-sol`.
+- Either an Azure Grove API key for `gpt-5.6-sol` or a standard OpenAI API key and model.
 
 Automated Embedding is currently an Atlas Public Preview capability. Ensure the
 cluster region supports it before bootstrapping.
@@ -106,8 +107,10 @@ mypy agent core data db evals scripts ui app.py chainlit_app.py`.
 
 ## Setup
 
-1. Copy `.env.example` to `.env` and fill in `MONGODB_URI`, `GROVE_API_KEY`, and
-   `VOYAGE_API_KEY`.
+1. Copy `.env.example` to `.env` and fill in `MONGODB_URI`, `VOYAGE_API_KEY`, and one
+   chat provider profile:
+   - Grove: `CHAT_PROVIDER=grove`, `GROVE_API_KEY`, `GROVE_BASE_URL`, `GROVE_MODEL`.
+   - OpenAI: `CHAT_PROVIDER=openai`, `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL`.
 2. Install with `uv sync --frozen --group dev`, or use
    `.venv/bin/python -m pip install -r requirements.txt` for the legacy pip workflow.
 3. Seed 800 artifacts, protected governance and claim records, validators, five lexical indexes,
@@ -125,7 +128,7 @@ Start the Chainlit interface with:
 Open `http://127.0.0.1:8000`. Each chat receives a MongoDB-checkpointed thread and
 shows coordinator routing, parallel source-agent retrieval, truthiness scoring,
 contradictions, citations, degraded capabilities, and semantic memory in expandable
-steps and side-panel inspectors. In local mode, Grove tokens stream through LangGraph's custom
+steps and side-panel inspectors. In local mode, chat-provider tokens stream through LangGraph's custom
 event channel under an explicit unverified-draft label; production buffers them until the
 application binds verified source links to the completed answer.
 
@@ -166,7 +169,7 @@ in-flight operation after 60 seconds. Override the corresponding `MONGODB_*_TIME
 variables after measuring production network and query latency.
 
 Run `.venv/bin/python -m scripts.smoke_ui` to exercise the same asynchronous
-LangGraph, Atlas, Grove, checkpoint, and memory path used by the UI.
+LangGraph, Atlas, chat-provider, checkpoint, and memory path used by the UI.
 
 ### Prompt evaluation catalog
 
@@ -236,9 +239,9 @@ while `.env.example` remains visible. Never commit or paste values from `.env`.
 ## Tests
 
 Run `.venv/bin/python -m pytest`. Unit tests use in-memory fakes and require no
-Atlas, Voyage, or Grove credentials. External integration tests are skipped normally.
+Atlas, Voyage, Grove, or OpenAI credentials. External integration tests are skipped normally.
 
-To verify Atlas index readiness, ACL and retention filters, Voyage reranking, Grove typed
+To verify Atlas index readiness, ACL and retention filters, Voyage reranking, chat-provider typed
 and streaming response shapes, and Chainlit startup on an ephemeral port, run
 `RUN_LIVE_INTEGRATION=1 .venv/bin/python -m pytest tests/integration -q`.
 The live profile reads credentials from `.env`, never command-line arguments, and does
@@ -276,7 +279,7 @@ for controlled demonstrations only. Production requires `AUTH_MODE=oauth`, an
 
 Chainlit defaults to localhost-only origins, disabled uploads, a 30-minute connection
 session, and 24-hour user-session expiry. `APP_ENV=production` refuses non-OAuth auth,
-buffers unverified draft tokens, and requires HTTPS for Grove.
+buffers unverified draft tokens, and requires HTTPS for external chat providers.
 Password-mode signing secrets must be non-placeholder values of at least 32 characters.
 For deployment, replace the localhost origins with the
 exact HTTPS application origin and integrate enterprise OAuth/OIDC before exposure.
@@ -284,8 +287,9 @@ exact HTTPS application origin and integrate enterprise OAuth/OIDC before exposu
 Application degradation is emitted as structured JSON with event, correlation ID,
 graph node, source, exception type, and degraded capability. Prompts, retrieved content,
 credentials, and raw exception text are excluded. Configure `LOG_LEVEL`,
-`GROVE_TIMEOUT_SECONDS`, `GROVE_MAX_RETRIES`, `VOYAGE_RERANK_TIMEOUT_SECONDS`, and
-`VOYAGE_RERANK_MAX_RETRIES` for the deployment environment.
+`GROVE_TIMEOUT_SECONDS`, `GROVE_MAX_RETRIES`, `OPENAI_TIMEOUT_SECONDS`,
+`OPENAI_MAX_RETRIES`, `VOYAGE_RERANK_TIMEOUT_SECONDS`, and `VOYAGE_RERANK_MAX_RETRIES`
+for the deployment environment.
 
 Durable memories are selectively written, redacted, typed, importance-scored, semantically
 merged or reinforced, versioned, provenance-tagged, capped per user, and filtered by tenant,

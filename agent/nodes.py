@@ -11,7 +11,7 @@ from core.conversation import compact_conversation, recent_conversation_context
 from core.memory import SemanticMemory
 from core.memory_policy import MEMORY_SCHEMA_VERSION, decide_memory_write
 from core.observability import get_logger, log_event, log_failure
-from core.providers.chat import GroveChatProvider
+from core.providers.chat import ChatProvider
 from core.providers.rerank import VoyageReranker
 from core.reconciliation import DEFAULT_RECONCILIATION_WEIGHTS, ReconciliationWeights, reconcile
 from core.schemas import (
@@ -38,7 +38,7 @@ class AgentNodes:
     recent_context_max_chars = 4000
     conversation_summary_max_chars = 1500
 
-    def __init__(self, db: Database, chat: GroveChatProvider, source_top_k: int,
+    def __init__(self, db: Database, chat: ChatProvider, source_top_k: int,
                  memory_top_k: int, memory_retention_days: int = 30,
                  memory_max_per_user: int = 100,
                  memory_min_importance: float = 0.65,
