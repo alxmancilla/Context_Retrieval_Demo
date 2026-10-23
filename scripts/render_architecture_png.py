@@ -4,7 +4,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 OUT = Path("public/solution-architecture.png")
-W, H = 1600, 950
+W, H = 1600, 1000
 TEXT = "#09251d"
 GREEN = "#116149"
 BLUE = "#1f6feb"
@@ -55,9 +55,9 @@ def render() -> None:
         draw.polygon([(x2, y2), left, right], fill=color)
 
     draw.text((52, 48), "Context Retrieval Demo - Designed/Implemented Architecture", fill=TEXT, font=TITLE)
-    draw.rounded_rectangle((45, 105, 1555, 850), radius=26, fill="white", outline="#d5e7dc", width=3)
+    draw.rounded_rectangle((45, 105, 1555, 900), radius=26, fill="white", outline="#d5e7dc", width=3)
 
-    box(85, 175, 210, 96, "Chainlit UI", ["answer + side tabs"], "#e8f5ee", GREEN)
+    box(85, 175, 210, 96, "Chainlit UI", ["answer + inspectors"], "#e8f5ee", GREEN)
     box(355, 175, 240, 96, "Identity Gate", ["realm, user, principals"], "#fdecec", RED)
     box(665, 175, 230, 96, "LangGraph", ["coordinator + state"], "#e8f5ee", GREEN)
     box(965, 175, 220, 96, "Intent", ["route + rewrite"], "#e8f5ee", GREEN)
@@ -65,30 +65,38 @@ def render() -> None:
     arrow([(595, 223), (665, 223)])
     arrow([(895, 223), (965, 223)])
 
+    box(85, 330, 275, 105, "Pipeline Inspector", ["active mode + counts", "rerank + degradation"], "#eef7ff", BLUE)
+    arrow([(190, 271), (190, 330)])
+
     box(675, 370, 285, 118, "Context Path", ["recent turns", "governed memory-v2", "non-authoritative"], "#e8f5ee", GREEN)
     box(1055, 370, 310, 118, "Source Agents", ["GitHub, Jira, SharePoint", "Confluence, Teams"], "#e8f5ee", GREEN)
     arrow([(1075, 271), (1075, 330), (820, 330), (820, 370)])
     arrow([(1075, 271), (1075, 330), (1210, 330), (1210, 370)])
 
-    box(105, 392, 250, 90, "Checkpoints", ["execution state + TTL"], "#eef7ff", BLUE)
-    box(405, 392, 250, 90, "Memory Nodes", ["typed, valid, versioned"], "#eef7ff", BLUE)
-    arrow([(780, 271), (780, 320), (230, 320), (230, 392)])
+    box(405, 350, 250, 80, "Checkpoints", ["execution state + TTL"], "#eef7ff", BLUE)
+    box(405, 455, 250, 90, "Memory Nodes", ["typed + governed TTL"], "#eef7ff", BLUE)
+    arrow([(780, 271), (780, 320), (530, 320), (530, 350)])
     arrow([(675, 430), (655, 430)])
+    arrow([(675, 455), (655, 500)])
 
-    box(1025, 585, 365, 118, "MongoDB Atlas", ["hybrid search: vector + lexical", "ACL filters before ranking", "governance + claims"], "#eef7ff", BLUE)
+    box(1025, 585, 365, 138, "MongoDB Atlas", ["hybrid: vector + lexical", "$rankFusion + ACL filters", "voyage-4 autoEmbed"], "#eef7ff", BLUE)
     arrow([(1210, 488), (1210, 585)])
     arrow([(1025, 645), (850, 645), (850, 488)])
+    box(1160, 760, 300, 95, "Retrieval Mode", ["hybrid | vector | lexical", "demo comparison switch"], "#eef7ff", BLUE)
+    arrow([(1210, 723), (1210, 760)])
 
-    box(680, 645, 230, 90, "Voyage AI", ["global reranking"], "#fff7e6", ORANGE)
-    box(385, 645, 240, 90, "Reconciliation", ["authority + freshness", "indexed claims"], "#e8f5ee", GREEN)
+    box(680, 645, 230, 90, "Voyage AI", ["rerank-3 global"], "#fff7e6", ORANGE)
+    box(385, 635, 250, 110, "Reconciliation", ["authority + claims", "conflict winners"], "#e8f5ee", GREEN)
+    box(395, 790, 270, 80, "Conflict Notes", ["readable eval terms"], "#e8f5ee", GREEN)
     box(105, 645, 210, 90, "Grove", ["grounded answer"], "#fff7e6", ORANGE)
     arrow([(1025, 645), (910, 690)])
     arrow([(680, 690), (625, 690)])
+    arrow([(510, 745), (510, 790)])
     arrow([(385, 690), (315, 690)])
     arrow([(105, 690), (70, 690), (70, 223), (85, 223)])
 
-    box(1285, 760, 215, 60, "/ready checks", ["11 indexes + metrics"], "#eef7ff", BLUE)
-    draw.text((70, 885), "Protected governance and indexed claim assertions determine truth. Model output is rebound only to retrieved citations.", fill=TEXT, font=TINY)
+    box(85, 790, 230, 65, "/ready checks", ["11 indexes + metrics"], "#eef7ff", BLUE)
+    draw.text((70, 925), "Protected governance and indexed claim assertions determine truth. Conflict notes expose evaluated terms; model output is rebound only to retrieved citations.", fill=TEXT, font=TINY)
     img.save(OUT)
 
 
