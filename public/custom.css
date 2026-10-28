@@ -1,148 +1,170 @@
 :root {
-  --mdb-navy: #001e2b;
-  --mdb-green: #00684a;
-  --mdb-spring: #00ed64;
-  --mdb-mint: #e3fcf7;
-  --mdb-canvas: #f9fbfa;
-  --mdb-border: #c1c7c6;
-  --mdb-shadow: 0 10px 30px rgba(0, 30, 43, 0.08);
+  --chat-bg: #f7f7f4;
+  --chat-surface: #ffffff;
+  --chat-surface-soft: #f1f0eb;
+  --chat-ink: #1f2328;
+  --chat-muted: #6f756f;
+  --chat-border: rgba(31, 35, 40, 0.11);
+  --chat-accent: #12805c;
+  --chat-accent-soft: #e7f6ee;
+  --chat-shadow: 0 18px 50px rgba(31, 35, 40, 0.11);
+  --chat-width: min(100%, 52rem);
 }
 
 html, body { font-feature-settings: "kern", "liga", "calt"; }
 
 body {
   background:
-    radial-gradient(circle at 85% 8%, rgba(0, 237, 100, 0.09), transparent 24rem),
-    var(--mdb-canvas);
+    radial-gradient(circle at 50% -12rem, rgba(18, 128, 92, 0.10), transparent 34rem),
+    var(--chat-bg) !important;
+  color: var(--chat-ink);
 }
 
 .dark body {
+  --chat-bg: #111315;
+  --chat-surface: #1a1c1f;
+  --chat-surface-soft: #23262a;
+  --chat-ink: #f1f0eb;
+  --chat-muted: #b8b5ac;
+  --chat-border: rgba(241, 240, 235, 0.12);
+  --chat-accent: #7ee0ad;
+  --chat-accent-soft: rgba(126, 224, 173, 0.12);
+  --chat-shadow: 0 20px 70px rgba(0, 0, 0, 0.30);
   background:
-    radial-gradient(circle at 85% 8%, rgba(0, 237, 100, 0.08), transparent 26rem),
-    var(--mdb-navy);
+    radial-gradient(circle at 50% -12rem, rgba(126, 224, 173, 0.10), transparent 34rem),
+    var(--chat-bg) !important;
 }
 
 header {
-  border-bottom: 1px solid color-mix(in srgb, var(--mdb-green) 22%, transparent);
-  background: color-mix(in srgb, var(--mdb-canvas) 88%, transparent) !important;
-  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--chat-border) !important;
+  background: color-mix(in srgb, var(--chat-bg) 88%, transparent) !important;
+  backdrop-filter: blur(18px) saturate(1.15);
 }
 
-.dark header {
-  background: color-mix(in srgb, var(--mdb-navy) 88%, transparent) !important;
-}
+header .logo { filter: drop-shadow(0 4px 12px rgba(18, 128, 92, 0.18)); }
 
-header .logo { filter: drop-shadow(0 3px 7px rgba(0, 104, 74, 0.2)); }
+main {
+  background: transparent !important;
+}
 
 aside {
-  border-color: color-mix(in srgb, var(--mdb-green) 18%, transparent) !important;
+  border-color: var(--chat-border) !important;
+  background: color-mix(in srgb, var(--chat-bg) 94%, var(--chat-surface)) !important;
 }
 
-button { transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease; }
+button, textarea, input {
+  transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease,
+    background-color 140ms ease;
+}
 
-button:hover:not(:disabled) { border-color: var(--mdb-green); }
+button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--chat-accent) 40%, transparent); }
 
 button:focus-visible, textarea:focus-visible, input:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--mdb-spring) 40%, transparent) !important;
+  outline: 3px solid color-mix(in srgb, var(--chat-accent) 24%, transparent) !important;
   outline-offset: 2px;
 }
 
+[class*="message"], .markdown-body {
+  scroll-margin-bottom: 9rem;
+}
+
+.markdown-body {
+  max-width: var(--chat-width);
+  margin-inline: auto;
+  color: var(--chat-ink);
+  font-size: 0.98rem;
+  line-height: 1.72;
+}
+
+.markdown-body p { margin-block: 0.74rem; }
+.markdown-body a { text-underline-offset: 3px; }
+
 [id^="starter-"] {
-  min-height: 2.75rem;
-  border-color: color-mix(in srgb, var(--mdb-green) 28%, transparent) !important;
-  background: color-mix(in srgb, white 91%, var(--mdb-mint)) !important;
-  box-shadow: 0 2px 7px rgba(0, 30, 43, 0.05);
+  min-height: 3.15rem;
+  border: 1px solid var(--chat-border) !important;
+  border-radius: 1rem !important;
+  background: color-mix(in srgb, var(--chat-surface) 92%, var(--chat-accent-soft)) !important;
+  box-shadow: 0 3px 14px rgba(31, 35, 40, 0.05);
 }
 
 [id^="starter-"]:hover:not(:disabled) {
-  background: var(--mdb-mint) !important;
-  box-shadow: 0 5px 14px rgba(0, 104, 74, 0.12);
-  transform: translateY(-1px);
-}
-
-.dark [id^="starter-"] {
-  background: rgba(0, 104, 74, 0.18) !important;
-  border-color: rgba(0, 237, 100, 0.24) !important;
+  background: var(--chat-surface) !important;
+  box-shadow: 0 12px 30px rgba(31, 35, 40, 0.10);
+  transform: translateY(-2px);
 }
 
 #message-composer {
-  border: 1px solid color-mix(in srgb, var(--mdb-green) 38%, transparent);
-  background: color-mix(in srgb, white 95%, var(--mdb-mint)) !important;
-  box-shadow: var(--mdb-shadow);
+  max-width: var(--chat-width);
+  margin-inline: auto;
+  border: 1px solid var(--chat-border) !important;
+  border-radius: 1.4rem !important;
+  background: color-mix(in srgb, var(--chat-surface) 96%, transparent) !important;
+  box-shadow: var(--chat-shadow);
+  backdrop-filter: blur(18px) saturate(1.08);
 }
 
 #message-composer:focus-within {
-  border-color: var(--mdb-green);
-  box-shadow: 0 0 0 3px rgba(0, 237, 100, 0.16), var(--mdb-shadow);
+  border-color: color-mix(in srgb, var(--chat-accent) 48%, transparent) !important;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--chat-accent) 12%, transparent), var(--chat-shadow);
 }
 
-.dark #message-composer {
-  background: #023430 !important;
-  border-color: rgba(0, 237, 100, 0.28);
-}
-
-#chat-input::placeholder { color: #5c6c75; }
-
-.markdown-body { line-height: 1.68; }
-.markdown-body a { text-underline-offset: 3px; }
+#chat-input::placeholder { color: var(--chat-muted); }
 
 .markdown-body a[href*="demo.cmm.local"] {
   display: inline-flex;
   max-width: 100%;
   margin: 0.08rem 0.12rem;
-  padding: 0.08rem 0.42rem;
-  border: 1px solid rgba(0, 104, 74, 0.22);
+  padding: 0.08rem 0.46rem;
+  border: 1px solid color-mix(in srgb, var(--chat-accent) 25%, transparent);
   border-radius: 999px;
-  background: var(--mdb-mint);
-  color: var(--mdb-green) !important;
+  background: var(--chat-accent-soft);
+  color: var(--chat-accent) !important;
   font-size: 0.86em;
-  font-weight: 600;
+  font-weight: 650;
   text-decoration: none;
   vertical-align: baseline;
   overflow-wrap: anywhere;
 }
 
 .markdown-body a[href*="demo.cmm.local"]:hover {
-  border-color: var(--mdb-green);
-  box-shadow: 0 2px 7px rgba(0, 104, 74, 0.14);
-}
-
-.dark .markdown-body a[href*="demo.cmm.local"] {
-  background: rgba(0, 237, 100, 0.1);
-  border-color: rgba(0, 237, 100, 0.28);
-  color: var(--mdb-spring) !important;
+  border-color: color-mix(in srgb, var(--chat-accent) 62%, transparent);
+  box-shadow: 0 3px 12px color-mix(in srgb, var(--chat-accent) 16%, transparent);
 }
 
 .markdown-body table {
   overflow: hidden;
-  border: 1px solid var(--mdb-border);
-  border-radius: 0.75rem;
+  border: 1px solid var(--chat-border);
+  border-radius: 1rem;
+  background: var(--chat-surface);
   font-size: 0.86rem;
 }
 
-.markdown-body th { background: color-mix(in srgb, var(--mdb-mint) 68%, white); }
-.dark .markdown-body th { background: rgba(0, 104, 74, 0.24); }
+.markdown-body th { background: var(--chat-surface-soft); }
 
 .markdown-body blockquote {
-  border-left: 4px solid #ffc010;
-  border-radius: 0 0.6rem 0.6rem 0;
-  background: color-mix(in srgb, #ffc010 10%, transparent);
-  padding: 0.7rem 1rem;
+  border-left: 4px solid var(--chat-accent);
+  border-radius: 0 0.9rem 0.9rem 0;
+  background: var(--chat-accent-soft);
+  padding: 0.85rem 1rem;
 }
 
 .markdown-body code:not(pre code) {
-  border: 1px solid color-mix(in srgb, var(--mdb-green) 18%, transparent);
-  border-radius: 0.35rem;
-  background: color-mix(in srgb, var(--mdb-mint) 65%, transparent);
-  color: var(--mdb-navy);
-  padding: 0.08rem 0.3rem;
+  border: 1px solid var(--chat-border);
+  border-radius: 0.45rem;
+  background: var(--chat-surface-soft);
+  color: var(--chat-ink);
+  padding: 0.08rem 0.32rem;
 }
 
-.dark .markdown-body code:not(pre code) { color: var(--mdb-spring); }
-
-[role="dialog"] { box-shadow: 0 24px 70px rgba(0, 30, 43, 0.24); }
+[role="dialog"] {
+  border: 1px solid var(--chat-border);
+  border-radius: 1.2rem !important;
+  box-shadow: 0 24px 70px rgba(31, 35, 40, 0.24);
+}
 
 @media (max-width: 640px) {
+  :root { --chat-width: min(100%, calc(100vw - 1rem)); }
   [id^="starter-"] { width: 100%; }
+  #message-composer { border-radius: 1.1rem !important; }
   .markdown-body a[href*="demo.cmm.local"] { font-size: 0.8em; }
 }

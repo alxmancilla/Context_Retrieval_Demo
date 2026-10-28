@@ -6,12 +6,15 @@ from chainlit.config import load_config
 from chainlit_app import STARTER_PROMPTS, should_stream_draft
 
 
-def test_mongodb_theme_assets_and_configuration():
+def test_modern_chat_theme_assets_and_configuration():
     theme = json.loads(Path("public/theme.json").read_text())
+    css = Path("public/custom.css").read_text()
     config = load_config()
 
     assert config.ui.custom_css == "/public/custom.css"
     assert config.ui.default_theme == "light"
+    assert config.ui.default_sidebar_state == "closed"
+    assert config.ui.alert_style == "modern"
     assert config.ui.logo_file_url == "/public/leaf-mark.svg"
     assert Path("public/leaf-mark.svg").is_file()
     assert config.project.allow_origins == [
@@ -24,7 +27,10 @@ def test_mongodb_theme_assets_and_configuration():
         variables = theme["variables"][variant]
         assert variables["--primary"]
         assert variables["--background"]
-        assert variables["--ring"] == "145 100% 46%"
+        assert variables["--radius"] == "1rem"
+    assert "--chat-width: min(100%, 52rem)" in css
+    assert "#message-composer" in css
+    assert "backdrop-filter: blur(18px)" in css
 
 
 def test_starter_catalog_covers_enterprise_evaluation_scenarios():

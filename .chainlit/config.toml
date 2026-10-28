@@ -105,7 +105,7 @@ default_theme = "light"
 
 layout = "wide"
 
-default_sidebar_state = "open"  # Options: "open", "closed", "hidden"
+default_sidebar_state = "closed"  # Options: "open", "closed", "hidden"
 
 # Chat settings display location: "message_composer" (default) or "sidebar" (header)
 # chat_settings_location = "message_composer"
@@ -134,7 +134,7 @@ custom_css = "/public/custom.css"
 # custom_js = "/public/test.js"
 
 # The style of alert boxes. Can be "classic" or "modern".
-alert_style = "classic"
+alert_style = "modern"
 
 # Specify additional attributes for custom JS file
 # custom_js_attributes = "async type = \"module\""

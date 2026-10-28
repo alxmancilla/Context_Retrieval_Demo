@@ -1,15 +1,15 @@
-# AI Context Platform Assistant
+# How can I help with your enterprise context?
 
-Ask questions across simulated **GitHub, Confluence, Jira, SharePoint, and Teams**.
+Ask a natural-language question across simulated **GitHub, Confluence, Jira, SharePoint, and Teams**.
 
 The coordinator searches source specialists in parallel, uses Voyage AI to rerank authorized
 evidence, and combines semantic relevance, governed authority, and freshness. When sources
 conflict, it identifies one current or authoritative representative per value, distinguishes
 historical suggestions from effective policy, and reports the score margin.
 
-Every factual citation is bound to a retrieved artifact. Expand **Agent activity** and the
-side-panel inspectors to compare Atlas vector and Voyage rerank scores, evidence governance,
-contradiction representatives, lifecycle status, and the final deterministic decision.
+Every factual citation is bound to a retrieved artifact. Expand **Agent activity** only when you
+want the details: Atlas scores, Voyage rerank scores, governance, contradiction representatives,
+lifecycle status, and the final deterministic decision.
 
 Embeddings are managed by Atlas Automated Embedding indexes over the `content` field, so you will
 not see `embedding` arrays in the collections. Source retrieval combines Atlas Vector Search,
