@@ -202,9 +202,11 @@ Current demo state:
 - 800 synthetic enterprise artifacts across five source systems.
 - 11 Atlas Search and Vector Search indexes recreated and ready.
 - Schema, retrieval, integration, and UI smoke checks completed.
-- Chainlit demo can be restarted locally when needed.
+- Source routing can be compared across `intent`, `all`, and `explicit_only` modes.
+- The rendered architecture diagram has been refreshed to show the current routing model.
+- Chainlit demo can be restarted locally when needed; it is not assumed to be always running.
 
-Note: deterministic live RAG gates are tracked separately from infrastructure health; the current follow-up item is a latency and wording-coverage investigation.
+Live RAG and assurance retrieval gates are tracked separately from infrastructure health; the latest validated state has both passing at **4/4**.
 
 ---
 

@@ -63,8 +63,8 @@ keep the core pipeline unchanged and swap the profile assets:
 - customer-facing presentation narrative
 
 The Chainlit **Retrieval pipeline** side-panel inspector makes the reusable value visible by showing
-Automated Embedding, hybrid `$rankFusion`, Voyage `rerank-3`, source counts, contradiction counts,
-fallbacks, and degraded markers for each turn.
+the active source-routing and source-retrieval modes, Automated Embedding, hybrid `$rankFusion`,
+Voyage `rerank-3`, source counts, contradiction counts, fallbacks, and degraded markers for each turn.
 
 ## Contradiction behavior
 
@@ -135,8 +135,10 @@ event channel under an explicit unverified-draft label; production buffers them 
 application binds verified source links to the completed answer.
 
 The UI includes an explicit **Architecture** header link and a README/welcome preview that open
-`/public/solution-architecture.png`. The architecture diagram is intentionally not attached as an
-automatic side tab on every chat; users open it only when they want the visual design reference.
+`/public/solution-architecture.png`. The rendered SVG/PNG assets match the Mermaid source diagram,
+including `Source Routing` with `intent | all | explicit` modes. The architecture diagram is
+intentionally not attached as an automatic side tab on every chat; users open it only when they want
+the visual design reference.
 Use `/health` for process liveness and `/ready` for MongoDB/index readiness, content-free
 connection-pool and memory counters, and active agent/prompt/embedding version identifiers.
 
@@ -270,8 +272,9 @@ retrieval checks covering JWKS rotation, PA dead-letter replay, eligibility inva
 break-glass PHI logging. Run `.venv/bin/python -m scripts.load_retrieval --rounds 3 --workers 5`
 for a bounded, metric-only concurrent Atlas retrieval smoke; it prints no document content.
 
-Current validated baseline: **114 unit/default-profile tests pass**, four credential-gated live
-tests skip by default, **4/4 live RAG cases pass**, and **4/4 assurance retrieval cases pass**.
+Current validated baseline: **136 default-profile tests pass with four skipped**, Ruff and Python
+3.11 mypy pass, **4/4 live RAG cases pass**, and **4/4 assurance retrieval cases pass**. The rendered
+architecture SVG/PNG assets are refreshed and served by Chainlit when the local demo is running.
 
 ## Security note
 

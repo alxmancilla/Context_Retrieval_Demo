@@ -13,6 +13,15 @@ The UI's architecture visual is served as the static asset
 seeing Mermaid source instead of a diagram, confirm they are using the PNG link rather than a raw
 Markdown/Mermaid block; Chainlit does not execute Mermaid code blocks in `cl.Text`.
 
+## Local demo lifecycle
+
+The local Chainlit demo is started on demand; documentation and decks do not assume port `8000` is
+always running. Start it with `.venv/bin/chainlit run chainlit_app.py --host 127.0.0.1 --port 8000`,
+then use `/health`, `/ready`, and `/public/solution-architecture.png` to confirm the UI, runtime,
+and refreshed architecture asset are serving. Stop the foreground process with `Ctrl+C`; if the demo
+was launched in the background, stop the recorded PID or any listener on port `8000` before starting
+a new instance.
+
 ## Atlas embedding verification
 
 Do not look for `embedding` or vector array fields in the collections. This demo uses Atlas

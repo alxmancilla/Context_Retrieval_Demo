@@ -287,7 +287,9 @@ Validation covers multiple layers:
 - load smoke checks
 - documentation and configuration checks
 
-Current known follow-up: deterministic live RAG gates need investigation for one latency-budget miss and one required-term coverage miss.
+Current status: deterministic live RAG gates and assurance retrieval gates pass **4/4**. The rendered
+architecture assets are refreshed to show `Source Routing` with `intent`, `all`, and `explicit_only`
+comparison modes.
 
 ---
 

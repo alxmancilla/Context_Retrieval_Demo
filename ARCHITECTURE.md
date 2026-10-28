@@ -255,15 +255,16 @@ visible in the evidence inspector for auditability.
   suggestion, grounds both representatives, and produces four verified source entries.
 - Generic `[source:artifact_id]` output is deterministically rebound to the verified artifact's
   actual source. Model-supplied markdown URLs are removed before rebinding.
-- The live RAG evaluation harness remains part of the release gate. The latest post-reseed
-  follow-up tracks two metric-gate regressions: one latency-budget miss and one required-term
-  coverage miss; retrieval, citations, and degradation checks remained healthy.
+- The live RAG evaluation harness remains part of the release gate. The latest source-routing
+  validation passes **4/4 live RAG cases** with `rerank-3` and no degraded turns.
 - All **4/4 assurance retrieval cases pass** for key rotation, dead-letter replay, cache
   invalidation, and break-glass logging.
 - A 15-operation, five-worker Atlas retrieval smoke completed with zero errors and no content
   logging; this is a bounded smoke, not a production capacity benchmark.
-- The default test profile reports **114 passed and four credential-gated live tests skipped**;
-  Ruff, mypy, dependency validation, and IDE diagnostics pass.
+- The rendered architecture SVG/PNG assets match the source diagram, including `Source Routing`
+  with `intent | all | explicit` comparison modes.
+- The default test profile reports **136 passed and four skipped**; Ruff, Python 3.11 mypy, and IDE
+  diagnostics pass.
 - Atlas vector-score fallback is covered by deterministic failure-path tests.
 
 ## Conclusion

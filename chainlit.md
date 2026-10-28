@@ -13,7 +13,8 @@ lifecycle status, and the final deterministic decision.
 
 Embeddings are managed by Atlas Automated Embedding indexes over the `content` field, so you will
 not see `embedding` arrays in the collections. Source retrieval combines Atlas Vector Search,
-lexical Search, ACL filters, and `$rankFusion`; Voyage reranks only authorized candidates.
+lexical Search, ACL filters, and `$rankFusion`; Voyage reranks only authorized candidates. The
+retrieval inspector also shows the active source routing mode: `intent`, `all`, or `explicit_only`.
 
 ## Visual architecture
 
