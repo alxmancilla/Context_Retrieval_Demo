@@ -72,6 +72,13 @@ Increase one dimension at a time while monitoring Atlas connections, query laten
 CPU, disk IOPS, and application pool counters. The script prints metrics only, never content.
 Do not infer production capacity from the default five-worker smoke.
 
+Use `python -m scripts.benchmark_modes` to compare the default `intent + hybrid` path against
+all-source routing, explicit-source routing, vector-only retrieval, and lexical-only retrieval. See
+`docs/routing-retrieval-benchmark.md` for the recommended interpretation table.
+
+Use `docs/production-readiness.md` as the pre-production checklist for index inventory, ingestion
+lifecycle, failure-mode demonstrations, and explicit production limits.
+
 ## Backup and restore
 
 1. Enable Atlas continuous cloud backup or scheduled snapshots according to the required RPO.

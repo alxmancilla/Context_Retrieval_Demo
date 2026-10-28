@@ -42,6 +42,8 @@ The current profile is spread across these files:
 - `chainlit_app.py` — customer-facing starter prompts.
 - `evals/cases.json` — deterministic live RAG cases.
 - `evals/retrieval_cases.json` — retrieval assurance cases.
+- `docs/routing-retrieval-benchmark.md` — routing/retrieval comparison plan.
+- `docs/production-readiness.md` — index inventory, ingestion lifecycle, failure modes, and limits.
 - `presentations/` — customer and technical talk tracks.
 - `ARCHITECTURE.md` and `README.md` — reusable architecture explanation.
 
@@ -177,8 +179,8 @@ For the first reusable profile, keep code changes minimal:
 3. Update starter prompts in `chainlit_app.py`.
 4. Update `evals/cases.json` and `evals/retrieval_cases.json`.
 5. Run `app.py bootstrap --wait`.
-6. Run tests, retrieval evals, and UI smoke.
-7. Update the customer deck and demo script.
+6. Run tests, retrieval evals, routing/retrieval benchmarks, and UI smoke.
+7. Update the customer deck, benchmark notes, and demo script.
 
 After two or more profiles exist, consider extracting the profile assets into separate folders and
 adding a `DEMO_PROFILE` setting.

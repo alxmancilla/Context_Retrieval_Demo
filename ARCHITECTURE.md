@@ -113,6 +113,8 @@ flowchart LR
   making the value of the default `hybrid` path visible in customer demos.
 - **Routing ablations:** `SOURCE_ROUTING_MODE` can run LLM intent routing, all-source retrieval,
   or explicit-name routing so teams can measure whether the routing model call improves outcomes.
+- **Benchmarkable design:** `scripts.benchmark_modes` reuses the deterministic live RAG evaluator to
+  compare routing and retrieval modes without printing model answers or document content.
 - **Global semantic reranking:** Voyage compares every candidate directly with the user query;
   Atlas vector similarity remains available as a resilient fallback.
 - **No reranker data loss:** Every returned index and score is validated, and incomplete or
@@ -266,6 +268,10 @@ visible in the evidence inspector for auditability.
 - The default test profile reports **136 passed and four skipped**; Ruff, Python 3.11 mypy, and IDE
   diagnostics pass.
 - Atlas vector-score fallback is covered by deterministic failure-path tests.
+
+For production design boundaries, index inventory, ingestion lifecycle, and failure-mode demo
+scripts, see [`docs/production-readiness.md`](docs/production-readiness.md). For routing/retrieval
+mode measurement, see [`docs/routing-retrieval-benchmark.md`](docs/routing-retrieval-benchmark.md).
 
 ## Conclusion
 

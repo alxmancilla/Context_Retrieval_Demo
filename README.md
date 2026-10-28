@@ -49,6 +49,9 @@ See [`SECURITY.md`](SECURITY.md) for provider data flows and production release 
 See [`OPERATIONS.md`](OPERATIONS.md) for readiness, SLO, restore, deletion, and incident procedures.
 See [`profiles/README.md`](profiles/README.md) for adapting the demo to other customer scenarios
 while reusing the same hybrid retrieval, reranking, governance, citation, and memory pipeline.
+See [`docs/routing-retrieval-benchmark.md`](docs/routing-retrieval-benchmark.md) for empirical
+comparison of routing/retrieval modes, and [`docs/production-readiness.md`](docs/production-readiness.md)
+for the index inventory, ingestion lifecycle, failure-mode script, and production boundaries.
 
 ## Reusable demo profile pattern
 
@@ -271,6 +274,9 @@ Run `.venv/bin/python -m evals.retrieval_runner` for four additional assurance-c
 retrieval checks covering JWKS rotation, PA dead-letter replay, eligibility invalidation, and
 break-glass PHI logging. Run `.venv/bin/python -m scripts.load_retrieval --rounds 3 --workers 5`
 for a bounded, metric-only concurrent Atlas retrieval smoke; it prints no document content.
+Run `.venv/bin/python -m scripts.benchmark_modes` when you need a metric-only comparison of
+`SOURCE_ROUTING_MODE` and `SOURCE_RETRIEVAL_MODE` choices; results are written under ignored
+`evals/results/` paths.
 
 Current validated baseline: **136 default-profile tests pass with four skipped**, Ruff and Python
 3.11 mypy pass, **4/4 live RAG cases pass**, and **4/4 assurance retrieval cases pass**. The rendered
