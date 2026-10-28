@@ -60,7 +60,7 @@ def render() -> None:
     box(85, 175, 210, 96, "Chainlit UI", ["answer + inspectors"], "#e8f5ee", GREEN)
     box(355, 175, 240, 96, "Identity Gate", ["realm, user, principals"], "#fdecec", RED)
     box(665, 175, 230, 96, "LangGraph", ["coordinator + state"], "#e8f5ee", GREEN)
-    box(965, 175, 220, 96, "Intent", ["route + rewrite"], "#e8f5ee", GREEN)
+    box(965, 175, 220, 96, "Source Routing", ["intent | all | explicit"], "#e8f5ee", GREEN)
     arrow([(295, 223), (355, 223)])
     arrow([(595, 223), (665, 223)])
     arrow([(895, 223), (965, 223)])
