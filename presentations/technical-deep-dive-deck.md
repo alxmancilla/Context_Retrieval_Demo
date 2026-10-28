@@ -23,8 +23,8 @@ Build an enterprise RAG assistant that can:
 Core components:
 
 - Chainlit UI for the demo experience.
-- LangGraph coordinator for stateful workflow orchestration.
-- Thin source agents for GitHub, Confluence, Jira, SharePoint, and Teams.
+- LangGraph coordinator for a deterministic agentic workflow.
+- Thin retrieval tools for GitHub, Confluence, Jira, SharePoint, and Teams.
 - MongoDB Atlas for source data, governance records, claims, checkpoints, and memory.
 - Atlas Vector Search and Atlas Search for retrieval.
 - Voyage `rerank-3` for global candidate reranking.
@@ -109,6 +109,12 @@ Demo comparison setting:
 - `SOURCE_RETRIEVAL_MODE=vector`
 - `SOURCE_RETRIEVAL_MODE=lexical`
 - `SOURCE_RETRIEVAL_MODE=hybrid`
+
+Routing comparison setting:
+
+- `SOURCE_ROUTING_MODE=intent`
+- `SOURCE_ROUTING_MODE=all`
+- `SOURCE_ROUTING_MODE=explicit_only`
 
 ---
 

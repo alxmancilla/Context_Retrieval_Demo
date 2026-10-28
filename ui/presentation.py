@@ -92,6 +92,7 @@ def retrieval_pipeline_markdown(
     source_results: dict[str, list[dict]], ranked_hits: list[dict],
     contradictions: list[dict], degraded: list[str], *, rerank_model: str,
     embedding_profile: str, source_top_k: int, retrieval_mode: str = "hybrid",
+    routing_mode: str = "intent",
 ) -> str:
     source_counts = {
         SOURCE_LABELS.get(source, source.title()): len(hits)
@@ -113,6 +114,7 @@ def retrieval_pipeline_markdown(
         "| Stage | What happened |",
         "|---|---|",
         f"| Automated Embedding | Atlas `autoEmbed` profile `{embedding_profile}` indexes source `content`; documents do not carry visible embedding arrays. |",
+        f"| Source routing mode | `{routing_mode}`. Use `intent` for LLM routing, `all` for all-source ablations, or `explicit_only` for rules-based comparisons. |",
         f"| Retrieval mode | `{retrieval_mode}`. Use `hybrid` for the production-style path, or `vector` / `lexical` for demo comparisons. |",
         f"| Candidate generation | Atlas Vector Search + lexical Search + ACL filters + `$rankFusion` when hybrid is enabled; target top-k per source is `{source_top_k}`. |",
         f"| Source fan-out | Retrieved `{retrieved}` authorized candidate(s) across `{len(source_counts)}` source(s). |",

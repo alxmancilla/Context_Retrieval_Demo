@@ -10,6 +10,7 @@ from core.reconciliation import ReconciliationWeights
 from core.source_agents import RetrievalMode
 
 ChatProviderName = Literal["grove", "openai"]
+SourceRoutingMode = Literal["intent", "all", "explicit_only"]
 
 
 def _required(name: str) -> str:
@@ -95,6 +96,13 @@ def _retrieval_mode() -> RetrievalMode:
     return mode  # type: ignore[return-value]
 
 
+def _source_routing_mode() -> SourceRoutingMode:
+    mode = os.getenv("SOURCE_ROUTING_MODE", "intent").strip().lower()
+    if mode not in {"intent", "all", "explicit_only"}:
+        raise ValueError("SOURCE_ROUTING_MODE must be 'intent', 'all', or 'explicit_only'")
+    return mode  # type: ignore[return-value]
+
+
 def _chat_provider() -> ChatProviderName:
     provider = os.getenv("CHAT_PROVIDER", "grove").strip().lower()
     if provider not in {"grove", "openai"}:
@@ -133,6 +141,7 @@ class Settings:
     agent_id: str
     source_top_k: int
     source_retrieval_mode: RetrievalMode
+    source_routing_mode: SourceRoutingMode
     memory_top_k: int
     access_principals: tuple[str, ...]
     auth_mode: str
@@ -232,6 +241,7 @@ def get_settings() -> Settings:
         agent_id=os.getenv("AGENT_ID", "cmm-context-assistant"),
         source_top_k=_bounded_int("SOURCE_TOP_K", 5, 1, 50),
         source_retrieval_mode=_retrieval_mode(),
+        source_routing_mode=_source_routing_mode(),
         memory_top_k=_bounded_int("MEMORY_TOP_K", 3, 1, 20),
         access_principals=_csv("ACCESS_PRINCIPALS", "role:platform-engineer"),
         auth_mode=auth_mode,

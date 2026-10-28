@@ -19,12 +19,32 @@ def test_empty_source_routing_dispatches_all_sources():
 
 def test_malformed_empty_intent_uses_deterministic_fallback():
     nodes = object.__new__(AgentNodes)
+    nodes.source_routing_mode = "intent"
     nodes.chat = SimpleNamespace(
         invoke_typed=lambda *_args: SimpleNamespace(sources=[])
     )
     result = nodes.parse_intent({"query": "enterprise question", "correlation_id": "corr"})
     assert result["selected_sources"] == list(ALL_SOURCES)
     assert "intent_parser_fallback" in result["degraded"]
+
+
+def test_source_routing_all_mode_skips_intent_llm():
+    nodes = object.__new__(AgentNodes)
+    nodes.source_routing_mode = "all"
+    nodes.chat = SimpleNamespace(invoke_typed=lambda *_args: (_ for _ in ()).throw(AssertionError))
+    result = nodes.parse_intent({"query": "GitHub only?", "correlation_id": "corr"})
+    assert result["selected_sources"] == list(ALL_SOURCES)
+    assert result["intent"]["rewritten_query"] == "GitHub only?"
+
+
+def test_source_routing_explicit_only_uses_named_sources_or_all():
+    nodes = object.__new__(AgentNodes)
+    nodes.source_routing_mode = "explicit_only"
+    nodes.chat = SimpleNamespace(invoke_typed=lambda *_args: (_ for _ in ()).throw(AssertionError))
+    explicit = nodes.parse_intent({"query": "Compare GitHub and Jira", "correlation_id": "corr"})
+    broad = nodes.parse_intent({"query": "Which source is current?", "correlation_id": "corr"})
+    assert explicit["selected_sources"] == ["github", "jira"]
+    assert broad["selected_sources"] == list(ALL_SOURCES)
 
 
 def test_missing_registry_policy_is_reported_and_excluded():

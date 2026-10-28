@@ -1,8 +1,8 @@
 # AI Context Platform Assistant — MongoDB Demo
 
-A source-aware, multi-agent RAG demo that simulates GitHub, Confluence, Jira,
+A source-aware, deterministic agentic RAG workflow that simulates GitHub, Confluence, Jira,
 SharePoint, and Teams using MongoDB Atlas collections. A LangGraph coordinator
-fans out to thin source specialists, then centrally reconciles authority,
+fans out to thin retrieval specialists, then centrally reconciles authority,
 freshness, and explicit contradictions before asking the configured chat provider for a grounded,
 cited answer.
 
@@ -18,6 +18,8 @@ cited answer.
   `$rankFusion`, improving recall for both concepts and exact identifiers.
 - `SOURCE_RETRIEVAL_MODE=hybrid` is the default. Demo operators can temporarily switch to
   `vector` or `lexical` to show what each retrieval path misses before returning to hybrid.
+- `SOURCE_ROUTING_MODE=intent` is the default. Demo operators can compare it with `all`
+  and `explicit_only` to test whether source routing complexity improves quality or latency.
 - Voyage `rerank-3` globally reranks ACL-filtered candidates before deterministic
   reconciliation. Atlas vector similarity remains the fallback if reranking is unavailable.
 - Source truth score defaults to 55% semantic relevance, 30% authority, and 15%
@@ -38,7 +40,7 @@ cited answer.
 
 ## Architecture
 
-`validated identity → intent parser → parallel recent/durable context + hybrid source agents →
+`validated identity → source routing → parallel recent/durable context + hybrid retrieval tools →
 Voyage reranking → deterministic reconciliation → chat-provider grounded writer → selective memory → compaction`
 
 See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the complete component diagram, retrieval
@@ -162,6 +164,14 @@ For customer demos, `SOURCE_RETRIEVAL_MODE` can be set to:
 
 Use comparison modes only for demonstration and troubleshooting; the recommended default remains
 `hybrid`.
+
+For architecture ablations, `SOURCE_ROUTING_MODE` can be set to:
+
+- `intent` — default path: the chat provider parses intent and selects sources.
+- `all` — retrieves every source, useful for comparing quality and latency against routing.
+- `explicit_only` — uses source names mentioned in the prompt, otherwise falls back to all sources.
+
+Use this to verify whether source routing earns its extra model call for a given profile.
 
 The default connection timeouts are tuned for this low-concurrency demo: Atlas server
 selection fails after 5 seconds, connection establishment after 10 seconds, and an

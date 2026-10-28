@@ -67,9 +67,12 @@ def test_retrieval_pipeline_inspector_explains_hybrid_search_and_models():
         embedding_profile="voyage-4:auto-embed:v1",
         source_top_k=5,
         retrieval_mode="hybrid",
+        routing_mode="all",
     )
     assert "Atlas `autoEmbed`" in rendered
     assert "$rankFusion" in rendered
     assert "rerank-3" in rendered
     assert "Retrieval mode" in rendered
+    assert "Source routing mode" in rendered
+    assert "all-source ablations" in rendered
     assert "Hybrid `$rankFusion` hits: `1`" in rendered

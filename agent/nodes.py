@@ -23,6 +23,7 @@ from core.schemas import (
     SourceName,
 )
 from core.security import validate_agent_scope
+from core.settings import SourceRoutingMode
 from core.source_agents import RetrievalMode, SourceAgent
 
 LOGGER = get_logger("agent.nodes")
@@ -37,6 +38,7 @@ class AgentNodes:
     recent_context_messages = 6
     recent_context_max_chars = 4000
     conversation_summary_max_chars = 1500
+    source_routing_mode: SourceRoutingMode = "intent"
 
     def __init__(self, db: Database, chat: ChatProvider, source_top_k: int,
                  memory_top_k: int, memory_retention_days: int = 30,
@@ -52,6 +54,7 @@ class AgentNodes:
                  reconciliation_weights: ReconciliationWeights = DEFAULT_RECONCILIATION_WEIGHTS,
                  reranker: VoyageReranker | None = None,
                  source_retrieval_mode: RetrievalMode = "hybrid",
+                 source_routing_mode: SourceRoutingMode = "intent",
                  ) -> None:
         self.db = db
         self.chat = chat
@@ -68,6 +71,7 @@ class AgentNodes:
         self.conversation_summary_max_chars = conversation_summary_max_chars
         self.reconciliation_weights = reconciliation_weights
         self.reranker = reranker
+        self.source_routing_mode = source_routing_mode
         self.agents = {
             source: SourceAgent(
                 db[source], source, source_top_k, db[CLAIM_ASSERTIONS_COLLECTION],
@@ -88,6 +92,17 @@ class AgentNodes:
 
     def parse_intent(self, state: AgentState) -> dict:
         query = state["query"]
+        if self.source_routing_mode in {"all", "explicit_only"}:
+            explicit = self._explicit_sources(query)
+            selected = list(ALL_SOURCES) if self.source_routing_mode == "all" else explicit or list(ALL_SOURCES)
+            intent = Intent(
+                intent="enterprise_knowledge_query", entities={},
+                sources=selected, rewritten_query=query,
+            )
+            return {
+                "intent": intent.model_dump(), "selected_sources": intent.sources,
+                "source_results": {"__RESET__": []}, "degraded": ["__RESET__"],
+            }
         context = recent_conversation_context(
             state.get("messages", []), query, state.get("conversation_summary", ""),
             max_messages=2, max_chars=1000,
@@ -100,7 +115,7 @@ class AgentNodes:
             if not intent.sources:
                 raise ValueError("Intent parser selected no sources")
         except Exception as exc:
-            explicit = [source for source in ALL_SOURCES if source in query.lower()]
+            explicit = self._explicit_sources(query)
             intent = Intent(
                 intent="enterprise_knowledge_query", entities={},
                 sources=explicit or list(ALL_SOURCES), rewritten_query=query,
@@ -117,6 +132,11 @@ class AgentNodes:
             "intent": intent.model_dump(), "selected_sources": intent.sources,
             "source_results": {"__RESET__": []}, "degraded": degraded,
         }
+
+    @staticmethod
+    def _explicit_sources(query: str) -> list[SourceName]:
+        lowered = query.lower()
+        return [source for source in ALL_SOURCES if source in lowered]
 
     def retrieve_memory(self, state: AgentState) -> dict:
         try:

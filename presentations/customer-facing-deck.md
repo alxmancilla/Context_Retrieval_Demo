@@ -45,7 +45,7 @@ The demo shows a governed RAG pattern that can:
 
 ![Solution architecture](../public/solution-architecture.png)
 
-The assistant coordinates retrieval, reranking, reconciliation, generation, citations, and memory through a LangGraph workflow backed by MongoDB Atlas.
+The assistant coordinates retrieval, reranking, reconciliation, generation, citations, and memory through a deterministic LangGraph workflow backed by MongoDB Atlas.
 
 ---
 
@@ -82,7 +82,7 @@ The demo combines both using MongoDB `$rankFusion` so the system can find concep
 
 **Simple explanation:** semantic search finds what the user means; lexical search finds the exact words; hybrid search combines both.
 
-Demo option: run the same prompt in `vector`, `lexical`, and `hybrid` modes to show why the combined path is stronger than either path alone.
+Demo option: run the same prompt in `vector`, `lexical`, and `hybrid` modes to show why the combined path is stronger than either path alone. For architecture comparisons, switch source routing between `intent`, `all`, and `explicit_only`.
 
 ---
 

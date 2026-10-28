@@ -147,6 +147,7 @@ def run(cases_path: Path, output_path: Path, max_latency: float) -> dict:
             conversation_summary_max_chars=settings.conversation_summary_max_chars,
             reconciliation_weights=settings.reconciliation_weights,
             source_retrieval_mode=settings.source_retrieval_mode,
+            source_routing_mode=settings.source_routing_mode,
             reranker=create_voyage_reranker(
                 api_key=settings.voyage_api_key,
                 model=settings.voyage_rerank_model,

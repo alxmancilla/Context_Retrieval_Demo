@@ -14,7 +14,7 @@ flowchart LR
 
     subgraph APP[LangGraph Agent Runtime]
         direction TB
-        LG[Coordinator] --> INT[Intent Parsing<br/>Source Routing]
+        LG[Coordinator] --> INT[Source Routing<br/>Intent / All / Explicit]
         INT --> MEM[Recent Context + Durable Memory]
         INT --> FAN[Parallel Source Fan-out]
         FAN --> GH[GitHub Agent]
@@ -62,7 +62,7 @@ flowchart LR
 
 1. **Experience and security:** Chainlit provides the user experience. Production requires an
    allowed OAuth provider and validated realm/group claims; missing identity scope fails closed.
-2. **Agent orchestration:** After identity and intent validation, LangGraph retrieves bounded
+2. **Agentic workflow orchestration:** After identity validation and source routing, LangGraph retrieves bounded
    recent turns, governed durable memory, and all selected sources in the same parallel superstep.
 3. **Source-aware retrieval:** Thin agents represent GitHub, Confluence, Jira,
    SharePoint, and Teams. Atlas Automated Embedding keeps `voyage-4` vectors current for
@@ -103,7 +103,7 @@ flowchart LR
 
 ## Key technical decisions
 
-- **Thin source agents:** Connectors retrieve evidence but do not independently decide truth.
+- **Thin retrieval tools:** Source connectors retrieve evidence but do not independently decide truth.
 - **Parallel retrieval:** Independent source searches run concurrently to reduce latency.
 - **Managed embeddings:** Atlas Automated Embedding owns vector creation and synchronization for
   source content, reducing reusable-demo setup to documents, indexes, and source metadata.
@@ -111,6 +111,8 @@ flowchart LR
   combines rankings so exact terms and paraphrased concepts can both influence candidate recall.
 - **Comparison modes:** `SOURCE_RETRIEVAL_MODE` can temporarily run `vector` or `lexical` only,
   making the value of the default `hybrid` path visible in customer demos.
+- **Routing ablations:** `SOURCE_ROUTING_MODE` can run LLM intent routing, all-source retrieval,
+  or explicit-name routing so teams can measure whether the routing model call improves outcomes.
 - **Global semantic reranking:** Voyage compares every candidate directly with the user query;
   Atlas vector similarity remains available as a resilient fallback.
 - **No reranker data loss:** Every returned index and score is validated, and incomplete or
