@@ -9,13 +9,14 @@ from scripts.check_acl import expected_acl_documents
 def test_seed_has_five_islands_and_planted_conflicts():
     rows = all_artifacts("test-realm")
     counts = Counter(row["source"] for row in rows)
-    assert len(rows) == 800
+    assert len(rows) == 805
     assert set(counts) == {"github", "confluence", "jira", "sharepoint", "teams"}
-    assert set(counts.values()) == {160}
+    assert set(counts.values()) == {161}
     themes = Counter(row["metadata"]["theme"] for row in rows)
     assert themes == {
         "rx_partner_auth": 200, "pa_status_delivery": 200,
         "eligibility_cache": 200, "phi_logging": 200,
+        "mongodb_rag_latency": 5,
     }
     claim_values = {
         claim: {row["claims"].get(claim) for row in rows}
@@ -29,11 +30,28 @@ def test_seed_has_five_islands_and_planted_conflicts():
     assert all(row["realm_id"] == "test-realm" for row in rows)
     assert all("role:platform-engineer" in row["access_principals"] for row in rows)
     assert all(len(row["access_principals"]) == 2 for row in rows)
-    assert len({row["artifact_id"] for row in rows}) == 800
+    assert len({row["artifact_id"] for row in rows}) == 805
 
 
 def test_acl_diagnostic_expected_github_count_tracks_seed_data():
-    assert expected_acl_documents("test-realm") == 160
+    assert expected_acl_documents("test-realm") == 161
+
+
+def test_customer_demo_source_map_is_seeded_into_each_source_collection():
+    rows = [
+        row for row in all_artifacts("test-realm")
+        if row["metadata"].get("corpus_phase") == "customer-demo-source-map"
+    ]
+    assert len(rows) == 5
+    assert {row["source"] for row in rows} == {
+        "github", "confluence", "jira", "sharepoint", "teams"
+    }
+    assert {row["claims"]["agentic_rag_pattern"] for row in rows} == {
+        "parallel_evidence_retrieval"
+    }
+    combined = " ".join(row["content"] for row in rows).lower()
+    for term in ("latency", "pipeline trace", "rank fusion", "citations", "one retrieval plane"):
+        assert term in combined
 
 
 def test_assurance_expansion_is_balanced_relevant_and_governed():

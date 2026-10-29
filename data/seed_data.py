@@ -20,6 +20,10 @@ DOC_REFS = {
         "https://www.mongodb.com/docs/atlas/architecture/current/auditing/",
         "https://www.mongodb.com/docs/atlas/architecture/current/data-encryption/",
     ],
+    "mongodb_rag_latency": [
+        "https://www.mongodb.com/docs/atlas/atlas-search/",
+        "https://www.mongodb.com/docs/atlas/atlas-vector-search/",
+    ],
 }
 
 
@@ -178,6 +182,7 @@ CLAIMS = {
     "pa_status_delivery": {"pa_status_delivery": "events"},
     "eligibility_cache": {"eligibility_cache_ttl": "5_minutes"},
     "phi_logging": {"phi_logging": "redacted"},
+    "mongodb_rag_latency": {"agentic_rag_pattern": "parallel_evidence_retrieval"},
 }
 
 EXTRA_ARTIFACTS = [
@@ -189,6 +194,39 @@ EXTRA_ARTIFACTS = [
     ("teams", "eligibility-support-bulletin", "Eligibility support bulletin", "Support should invalidate affected entries, not extend the cache; production positive TTL remains 5 minutes.", 24, "eligibility_cache"),
     ("sharepoint", "phi-audit-standard", "Atlas PHI audit standard", "Production projects enable database auditing for access and security events; application logs remain redacted.", 22, "phi_logging"),
     ("jira", "SEC-631", "Enforce PHI log redaction", "Redaction tests, audit filters, and alerting were deployed. Raw payload debug flags were removed.", 9, "phi_logging"),
+]
+
+CUSTOMER_DEMO_ARTIFACTS: list[tuple[str, str, str, str, int, str, str, dict[str, object]]] = [
+    (
+        "github", "customer-demo-latency-coordinator", "Customer demo retrieval coordinator",
+        "The demo implementation routes source intent, fans out retrieval to GitHub, Confluence, Jira, SharePoint, and Teams, then writes one grounded answer after reconciliation. Source agents return evidence rows, not independent prose answers, for the Reduce multi-agent RAG latency and Verify answer citations questions.",
+        4, "implementation", "active",
+        {"repo": "context-retrieval-demo", "path": "agent/graph.py", "commit": "5ed4a88"},
+    ),
+    (
+        "confluence", "customer-demo-architecture-narrative", "Customer demo architecture narrative",
+        "The architecture narrative explains the customer message: merge evidence, not answers. It maps MongoDB as one retrieval plane for Atlas Search, Vector Search, rank fusion, checkpoints, memory, and the final cited writer step.",
+        6, "architecture", "effective",
+        {"space": "DEMO", "owner": "Solution Architecture", "version": 12},
+    ),
+    (
+        "jira", "DEMO-417", "Benchmark source routing and retrieval modes",
+        "The acceptance plan compares SOURCE_ROUTING_MODE intent, all, and explicit_only with SOURCE_RETRIEVAL_MODE hybrid, vector, and lexical. Metrics must prove end-to-end latency, candidate counts, citation coverage, and degraded capability behavior without printing document content.",
+        5, "validation", "active",
+        {"project": "DEMO", "issue_key": "DEMO-417", "status": "Done"},
+    ),
+    (
+        "sharepoint", "customer-demo-governance-standard", "Customer demo governance standard",
+        "Customer-facing answers must be grounded in retrieved MongoDB artifacts, show citations, keep memory non-authoritative, and preserve policy, lifecycle status, and authority metadata. This evidence supports Atlas controls for partners, PHI-safe troubleshooting, and Executive value summary prompts.",
+        7, "policy", "effective",
+        {"library": "Approved Standards", "folder": "/MongoDB Atlas/Agentic RAG"},
+    ),
+    (
+        "teams", "customer-demo-proof-points", "Customer demo proof points thread",
+        "The field team agreed to demonstrate the inline Pipeline trace, source counts, reranking, contradiction groups, and final cited answer to explain latency reduction, governed evidence, auditability, and production operations in customer conversations.",
+        3, "operations", "active",
+        {"team": "MongoDB Data Platform", "channel": "customer-demos", "participants": 8},
+    ),
 ]
 
 PLATFORM_APPLICATIONS = [
@@ -232,6 +270,7 @@ THEME_TITLES = {
     "pa_status_delivery": "Prior authorization status delivery",
     "eligibility_cache": "Eligibility cache strategy",
     "phi_logging": "PHI logging and audit policy",
+    "mongodb_rag_latency": "MongoDB-backed agentic RAG latency",
 }
 
 THEME_CURRENT_STATE = {
@@ -239,6 +278,7 @@ THEME_CURRENT_STATE = {
     "pa_status_delivery": "pa.status.changed events with idempotent consumers and dead-letter handling instead of polling",
     "eligibility_cache": "a 5-minute positive eligibility TTL and a 30-second negative TTL",
     "phi_logging": "redacted structured logs, correlation IDs, and Atlas database auditing with no raw PHI payloads",
+    "mongodb_rag_latency": "parallel authorized evidence retrieval, global reranking, deterministic reconciliation, and one final cited answer",
 }
 
 THEME_ACCESS_PRINCIPALS = {
@@ -246,6 +286,7 @@ THEME_ACCESS_PRINCIPALS = {
     "pa_status_delivery": "role:clinical-operations",
     "eligibility_cache": "role:benefits-operations",
     "phi_logging": "role:security",
+    "mongodb_rag_latency": "role:platform-architect",
 }
 
 ASSURANCE_CONTROLS = {
@@ -409,10 +450,22 @@ def supporting_artifacts() -> list[dict]:
     return rows
 
 
+def customer_demo_artifacts() -> list[dict]:
+    rows = []
+    for source, key, title, content, days_old, document_type, status, metadata in CUSTOMER_DEMO_ARTIFACTS:
+        rows.append(_artifact(
+            source, key, title, content, days_old, CLAIMS["mongodb_rag_latency"],
+            theme="mongodb_rag_latency", corpus_phase="customer-demo-source-map",
+            related_artifacts=["github-customer-demo-latency-coordinator"], **metadata,
+            governance={"document_type": document_type, "lifecycle_status": status},
+        ))
+    return rows
+
+
 def all_artifacts(realm_id: str) -> list[dict]:
     rows = (
         core_artifacts() + supporting_artifacts()
-        + scaled_enterprise_artifacts() + assurance_artifacts()
+        + scaled_enterprise_artifacts() + assurance_artifacts() + customer_demo_artifacts()
     )
     for row in rows:
         row["realm_id"] = realm_id

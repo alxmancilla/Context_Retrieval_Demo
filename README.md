@@ -69,6 +69,64 @@ The Chainlit **Retrieval pipeline** side-panel inspector makes the reusable valu
 the active source-routing and source-retrieval modes, Automated Embedding, hybrid `$rankFusion`,
 Voyage `rerank-3`, source counts, contradiction counts, fallbacks, and degraded markers for each turn.
 
+## Customer sample-question source map
+
+The Chainlit launcher is organized around the customer story: use MongoDB to reduce multi-agent RAG
+latency by merging governed evidence before generating one answer. The sample questions are grouped
+into **MongoDB latency wins**, **Governed evidence demos**, and **Production readiness**.
+
+Each question can retrieve from multiple simulated enterprise systems. The source systems are thin
+retrieval specialists; they return evidence, not independent prose answers. MongoDB Atlas provides the
+common retrieval plane across all of them.
+
+The seed corpus also writes one **customer-demo source-map** artifact into each corresponding Atlas
+source collection. Those records make the new launcher questions directly retrievable from `github`,
+`confluence`, `jira`, `sharepoint`, and `teams` instead of documenting the story only in this README.
+
+| Source | What it represents in the demo | Why it matters for the new questions |
+|---|---|---|
+| GitHub | Current implementation evidence: code paths, pull requests, commits, service configuration, and deployment changes. | Helps prove what is actually implemented today, especially for OAuth 2.0 + PKCE, PA event delivery, eligibility cache changes, and citation-backed current-state answers. |
+| Confluence | Architecture pages, design notes, migration guides, and sometimes stale reference material. | Useful for explaining design intent and for demonstrating why older documentation can lose to fresher implementation or policy evidence during reconciliation. |
+| Jira | Delivery records, incidents, rollout tickets, remediation work, and status transitions. | Supports timeline and operational questions such as proving latency improvements, tracing eligibility cache decisions, and showing PA migration progress. |
+| SharePoint | Policy, compliance, security, network-control, and runbook artifacts. | Provides authoritative governance evidence for production readiness, partner connectivity controls, PHI-safe troubleshooting, and auditability. |
+| Teams | Operational discussions, incident coordination, rollout notes, and informal guidance. | Helps demonstrate contradiction handling because Teams may contain useful operational context as well as stale or lower-authority claims. |
+
+The intended customer takeaway is that MongoDB lets the assistant compare all of these evidence types
+inside one governed workflow:
+
+1. **Route** to the sources likely to contain useful evidence.
+2. **Retrieve** authorized candidates from each source in parallel.
+3. **Fuse and rerank** evidence using Atlas Search, Vector Search, `$rankFusion`, and Voyage reranking.
+4. **Reconcile** with authority, freshness, lifecycle status, and normalized claims.
+5. **Generate once** from ranked, cited evidence.
+
+### How the new launcher questions use the sources
+
+- **Reduce multi-agent RAG latency** uses all source types to show why retrieval fan-out plus one final
+  writer call is faster and clearer than answer-generating specialist agents plus a merge agent.
+- **Merge evidence, not answers** highlights Atlas Search, Vector Search, and `$rankFusion` across
+  GitHub, Confluence, Jira, SharePoint, and Teams before final synthesis.
+- **One retrieval plane** emphasizes MongoDB as the shared layer for source metadata, evidence search,
+  vector retrieval, checkpoints, memory, and audit trails.
+- **Prove latency improvement** points to routing and retrieval benchmarks that compare `intent`, `all`,
+  and `explicit_only` routing against `hybrid`, `vector`, and `lexical` retrieval modes.
+- **Resolve the OAuth conflict** compares current GitHub implementation evidence, Jira rollout status,
+  Confluence architecture notes, and Teams discussions to show why the authoritative current answer wins.
+- **Trace the cache decision** combines Jira incident context, GitHub implementation evidence,
+  Confluence design history, and policy/runbook artifacts to produce a cited timeline.
+- **PHI-safe troubleshooting** demonstrates why SharePoint policy evidence can outrank informal Teams
+  troubleshooting suggestions while still preserving historical context.
+- **Verify answer citations** shows that factual claims must bind back to retrieved MongoDB artifacts,
+  not model-generated source summaries.
+- **Atlas controls for partners** emphasizes SharePoint policy, architecture evidence, and implementation
+  artifacts for network, encryption, and access-control readiness.
+- **Checkpoint and memory value** shows MongoDB checkpoints and semantic memory as conversation context,
+  while keeping enterprise source evidence as the factual authority.
+- **Prior auth event resilience** connects Jira operational tickets, GitHub implementation changes,
+  runbooks, and Teams incident coordination around idempotency, lag, failures, and recovery.
+- **Executive value summary** rolls up the full story: latency reduction, governed retrieval, citations,
+  auditability, and production operations.
+
 ## Contradiction behavior
 
 - Indexed claim assertions group artifacts that make competing assertions about the same fact.
@@ -118,7 +176,7 @@ mypy agent core data db evals scripts ui app.py chainlit_app.py`.
    - OpenAI: `CHAT_PROVIDER=openai`, `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL`.
 2. Install with `uv sync --frozen --group dev`, or use
    `.venv/bin/python -m pip install -r requirements.txt` for the legacy pip workflow.
-3. Seed 800 artifacts, protected governance and claim records, validators, five lexical indexes,
+3. Seed 805 artifacts, protected governance and claim records, validators, five lexical indexes,
    five Automated Embedding indexes, and one memory index:
    `.venv/bin/python app.py bootstrap --wait`
 4. Ask a contradiction-rich demo question:
@@ -226,7 +284,8 @@ Follow-ups use bounded checkpoint context, not durable memory. The context pack 
 system payloads, removes the current query from prior context, preserves prior citation labels such
 as `[jira:PA-44]`, and truncates long turns from the middle so both the setup and citations survive.
 
-The corpus contains 200 artifacts for each scenario and 160 artifacts in each of
+The corpus contains 200 artifacts for each healthcare scenario, plus five customer-demo source-map
+artifacts for the MongoDB-backed agentic RAG latency story. There are 161 artifacts in each of
 GitHub, Confluence, Jira, Teams, and SharePoint. The latest 160-record assurance expansion
 adds policy, architecture, implementation, validation, runbook, compliance, deprecation,
 and operations evidence. All records include stable fake source URLs, realistic source
@@ -278,7 +337,7 @@ Run `.venv/bin/python -m scripts.benchmark_modes` when you need a metric-only co
 `SOURCE_ROUTING_MODE` and `SOURCE_RETRIEVAL_MODE` choices; results are written under ignored
 `evals/results/` paths.
 
-Current validated baseline: **136 default-profile tests pass with four skipped**, Ruff and Python
+Current validated baseline: **141 default-profile tests pass with four skipped**, Ruff and Python
 3.11 mypy pass, **4/4 live RAG cases pass**, and **4/4 assurance retrieval cases pass**. The rendered
 architecture SVG/PNG assets are refreshed and served by Chainlit when the local demo is running.
 
