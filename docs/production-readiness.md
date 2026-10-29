@@ -63,6 +63,6 @@ production rollout, measure and harden:
 
 ## Design principle
 
-Do not add autonomous agents to solve governance problems. Keep source adapters thin, preserve
-central reconciliation, and treat the final model as a grounded writer rather than the authority
-engine, permission boundary, or citation source.
+Do not add autonomous answer-generating subagents to solve governance problems. Keep source adapters
+as thin retrieval tools, preserve central reconciliation, and treat the final model as a grounded
+writer rather than the authority engine, permission boundary, or citation source.

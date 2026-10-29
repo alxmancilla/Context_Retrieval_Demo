@@ -15,27 +15,31 @@ flowchart LR
     U[User] --> UI[Chainlit UI]
     UI --> AUTH[Fail-closed identity\nrealm + user + principals]
     AUTH --> LG[LangGraph coordinator]
-    LG --> INT[Intent parsing]
+    LG --> INT[Source routing\nintent | all | explicit]
     INT --> MEM[Recent context +\ngoverned memory]
-    INT --> SRC[Parallel source agents]
-    SRC --> HS[Atlas hybrid search\nvector + lexical + ACL]
-    HS --> RR[Voyage rerank]
+    INT --> SRC[Parallel retrieval tools\nsource-scoped, evidence only]
+    SRC --> HS[Atlas hybrid search\nvector + lexical + ACL + $rankFusion]
+    HS --> RR[Voyage rerank-3\nglobal candidate ordering]
     RR --> REC[Deterministic reconciliation\nauthority + freshness + claims]
-    REC --> GEN[Grove grounded answer]
+    REC --> GEN[Single chat provider writer\nGrove or OpenAI]
     GEN --> CIT[Verified citation binding]
-    CIT --> UI
+    CIT --> TRACE[Pipeline trace +\nfinal cited answer]
+    TRACE --> UI
     MEM --> GEN
     LG --> CKPT[(MongoDB checkpoints)]
     MEM --> M[(MongoDB memory nodes)]
-    HS --> A[(Atlas source, governance,\nand claim collections)]
+    HS --> A[(Atlas source artifacts,\ngovernance, and claims)]
 ```
 
 ### Implementation map
 
 - **State:** LangGraph checkpoints store execution state and recent turns.
 - **Memory:** governed memory nodes store only selected preferences, decisions, and task context.
-- **Retrieval:** source agents run ACL-filtered Atlas Vector Search + lexical Search, fused before reranking.
+- **Routing:** `intent`, `all`, and `explicit_only` modes make source-selection tradeoffs measurable.
+- **Retrieval:** source-specific tools run ACL-filtered Atlas Vector Search + lexical Search, fused with `$rankFusion` before reranking.
+- **Generation:** retrieval tools return evidence only; the final answer is generated once after reconciliation.
 - **Truth:** protected governance and indexed claims drive authority, lifecycle, and contradictions.
+- **Trace:** the main answer shows source routing, parallel retrieval, reranking, and reconciliation before the final cited answer.
 - **Security:** missing identity scope fails closed; retrieval filters apply before ranking.
 - **Operations:** `/ready` verifies MongoDB, all 11 indexes, pool counters, memory metrics, and versions.
 """.strip()

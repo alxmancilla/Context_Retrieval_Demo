@@ -57,7 +57,7 @@ def render() -> None:
     draw.text((52, 48), "Context Retrieval Demo - Designed/Implemented Architecture", fill=TEXT, font=TITLE)
     draw.rounded_rectangle((45, 105, 1555, 900), radius=26, fill="white", outline="#d5e7dc", width=3)
 
-    box(85, 175, 210, 96, "Chainlit UI", ["answer + inspectors"], "#e8f5ee", GREEN)
+    box(85, 175, 210, 96, "Chainlit UI", ["starters + chat"], "#e8f5ee", GREEN)
     box(355, 175, 240, 96, "Identity Gate", ["realm, user, principals"], "#fdecec", RED)
     box(665, 175, 230, 96, "LangGraph", ["coordinator + state"], "#e8f5ee", GREEN)
     box(965, 175, 220, 96, "Source Routing", ["intent | all | explicit"], "#e8f5ee", GREEN)
@@ -65,11 +65,11 @@ def render() -> None:
     arrow([(595, 223), (665, 223)])
     arrow([(895, 223), (965, 223)])
 
-    box(85, 330, 275, 105, "Pipeline Inspector", ["active mode + counts", "rerank + degradation"], "#eef7ff", BLUE)
+    box(85, 330, 275, 105, "Pipeline Trace", ["source counts + modes", "rerank + reconciliation"], "#eef7ff", BLUE)
     arrow([(190, 271), (190, 330)])
 
     box(675, 370, 285, 118, "Context Path", ["recent turns", "governed memory-v2", "non-authoritative"], "#e8f5ee", GREEN)
-    box(1055, 370, 310, 118, "Source Agents", ["GitHub, Jira, SharePoint", "Confluence, Teams"], "#e8f5ee", GREEN)
+    box(1055, 370, 310, 118, "Retrieval Tools", ["source-scoped, evidence only", "GitHub + Jira", "Confluence + SharePoint + Teams"], "#e8f5ee", GREEN)
     arrow([(1075, 271), (1075, 330), (820, 330), (820, 370)])
     arrow([(1075, 271), (1075, 330), (1210, 330), (1210, 370)])
 
@@ -79,10 +79,10 @@ def render() -> None:
     arrow([(675, 430), (655, 430)])
     arrow([(675, 455), (655, 500)])
 
-    box(1025, 585, 365, 138, "MongoDB Atlas", ["hybrid: vector + lexical", "$rankFusion + ACL filters", "voyage-4 autoEmbed"], "#eef7ff", BLUE)
+    box(1025, 585, 365, 138, "MongoDB Atlas", ["source artifacts + governance", "hybrid: vector + lexical", "$rankFusion + ACL filters"], "#eef7ff", BLUE)
     arrow([(1210, 488), (1210, 585)])
     arrow([(1025, 645), (850, 645), (850, 488)])
-    box(1160, 760, 300, 95, "Retrieval Mode", ["hybrid | vector | lexical", "demo comparison switch"], "#eef7ff", BLUE)
+    box(1160, 760, 300, 95, "Retrieval Plane", ["voyage-4 autoEmbed", "hybrid | vector | lexical"], "#eef7ff", BLUE)
     arrow([(1210, 723), (1210, 760)])
 
     box(680, 645, 230, 90, "Voyage AI", ["rerank-3 global"], "#fff7e6", ORANGE)
@@ -96,7 +96,7 @@ def render() -> None:
     arrow([(105, 690), (70, 690), (70, 223), (85, 223)])
 
     box(85, 790, 230, 65, "/ready checks", ["11 indexes + metrics"], "#eef7ff", BLUE)
-    draw.text((70, 925), "Protected governance and indexed claim assertions determine truth. Conflict notes expose evaluated terms; model output is rebound only to retrieved citations.", fill=TEXT, font=TINY)
+    draw.text((70, 925), "Protected governance and indexed claim assertions determine truth. Pipeline trace shows source routing, retrieval, reranking, reconciliation, and verified citations.", fill=TEXT, font=TINY)
     img.save(OUT)
 
 

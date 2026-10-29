@@ -4,6 +4,9 @@ Use this guide to turn the demo's routing and retrieval comparison switches into
 The goal is to show when the extra source-routing model call helps, when all-source retrieval is safer,
 and why hybrid Atlas retrieval remains the recommended default.
 
+The benchmark compares retrieval-tool fan-out patterns, not answer-generating subagents. Selected
+source tools return evidence only; one final writer model is called after reranking and reconciliation.
+
 ## What to compare
 
 | Mode family | Values | Question answered |

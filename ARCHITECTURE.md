@@ -16,20 +16,21 @@ flowchart LR
         direction TB
         LG[Coordinator] --> INT[Source Routing<br/>Intent / All / Explicit]
         INT --> MEM[Recent Context + Durable Memory]
-        INT --> FAN[Parallel Source Fan-out]
-        FAN --> GH[GitHub Agent]
-        FAN --> CF[Confluence Agent]
-        FAN --> JI[Jira Agent]
-        FAN --> SP[SharePoint Agent]
-        FAN --> TM[Teams Agent]
+        INT --> FAN[Parallel Retrieval Tool Fan-out]
+        FAN --> GH[GitHub Retrieval Tool<br/>Evidence Only]
+        FAN --> CF[Confluence Retrieval Tool<br/>Evidence Only]
+        FAN --> JI[Jira Retrieval Tool<br/>Evidence Only]
+        FAN --> SP[SharePoint Retrieval Tool<br/>Evidence Only]
+        FAN --> TM[Teams Retrieval Tool<br/>Evidence Only]
         GH --> RR[Global Semantic Reranking<br/>All Retrieved Candidates]
         CF --> RR
         JI --> RR
         SP --> RR
         TM --> RR
         RR --> REC[Deterministic Reconciliation]
-        REC --> GEN[Grounded Answer Generation]
+        REC --> GEN[Single Grounded Answer Generation]
         GEN --> CIT[Verified Citation Binding]
+        CIT --> TRACE[Pipeline Trace<br/>Routing + Retrieval + Reranking + Reconciliation]
     end
 
     subgraph ATLAS[MongoDB Atlas — Context and State Plane]
@@ -54,7 +55,7 @@ flowchart LR
     RR <--> VOYAGE[Voyage AI<br/>rerank-3]
     RR -. timeout or error .-> FALLBACK[Atlas Vector Score Fallback]
     FALLBACK --> REC
-    CIT --> UI
+    TRACE --> UI
     OBS[Structured JSON Logs<br/>Correlation + Degradation] -.-> APP
 ```
 
@@ -63,10 +64,11 @@ flowchart LR
 1. **Experience and security:** Chainlit provides the user experience. Production requires an
    allowed OAuth provider and validated realm/group claims; missing identity scope fails closed.
 2. **Agentic workflow orchestration:** After identity validation and source routing, LangGraph retrieves bounded
-   recent turns, governed durable memory, and all selected sources in the same parallel superstep.
-3. **Source-aware retrieval:** Thin agents represent GitHub, Confluence, Jira,
-   SharePoint, and Teams. Atlas Automated Embedding keeps `voyage-4` vectors current for
-   the `content` field, while lexical Atlas Search indexes preserve exact terms, IDs, and
+   recent turns, governed durable memory, and all selected source evidence in the same parallel superstep.
+3. **Source-aware retrieval:** Thin retrieval tools represent GitHub, Confluence,
+   Jira, SharePoint, and Teams. They return structured evidence only, not independently
+   generated answers. Atlas Automated Embedding keeps `voyage-4` vectors current for the
+   `content` field, while lexical Atlas Search indexes preserve exact terms, IDs, and
    titles. Atlas applies realm and ACL filters before either retrieval path returns results.
 4. **Hybrid fusion:** MongoDB `$rankFusion` combines the semantic and lexical rankings. This
    demonstrates why hybrid search is useful: vector retrieval catches paraphrased concepts,

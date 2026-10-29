@@ -49,6 +49,18 @@ _RUNTIME_LOCK = asyncio.Lock()
 
 
 SAMPLE_QUESTION_GROUPS = (
+    ("Original healthcare tests", (
+        ("Rx auth current state", "How do external partners authenticate to the Rx API today, and are any sources outdated?"),
+        ("Prior auth polling vs events", "For prior auth, should clients poll for status or consume events? What changed and when?"),
+        ("Eligibility cache timeline", "Build a timeline from the 60-minute eligibility cache design to the current deployment. Cite the incident, ticket, and implementation."),
+        ("PHI logging policy", "What is the documented PHI logging policy, and how does it differ from old troubleshooting practices?"),
+    )),
+    ("Targeted source-routing tests", (
+        ("GitHub + Jira auth proof", "Look only in GitHub and Jira. What proves Rx API OAuth 2.0 with PKCE is implemented and deployed?"),
+        ("SharePoint + Confluence PHI policy", "Look only in SharePoint and Confluence. What is the official PHI logging policy, and how does it compare with troubleshooting guidance?"),
+        ("GitHub + Jira + Teams PA events", "Look only in GitHub, Jira, and Teams. What changed from prior auth polling to status events, and what operational follow-up is visible?"),
+        ("Confluence + Jira + GitHub cache timeline", "Look only in Confluence, Jira, and GitHub. Build the eligibility cache timeline from original design to deployed implementation."),
+    )),
     ("MongoDB latency wins", (
         ("Reduce multi-agent RAG latency", "For this customer scenario, how does MongoDB Atlas help replace multiple answer-generating agents with parallel evidence retrieval, central reconciliation, and one final grounded answer?"),
         ("Merge evidence, not answers", "Show how Atlas Search, Vector Search, and rank fusion can merge evidence from GitHub, Confluence, Jira, SharePoint, and Teams before the final LLM call."),

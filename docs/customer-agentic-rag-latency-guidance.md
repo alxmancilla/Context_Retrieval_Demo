@@ -2,30 +2,31 @@
 
 ## Executive summary
 
-If a system calls multiple specialist agents, each agent runs RAG, each agent writes an answer, and
-then a main agent or merge agent combines those answers, latency will usually grow quickly.
+If a system calls multiple answer-writing subagents, each subagent runs RAG, each subagent writes an
+answer, and then a main agent or merge agent combines those answers, latency will usually grow quickly.
 
 The recommendation is:
 
 > Merge evidence, not answers.
 
 Keep the source-specific retrieval work parallel, but move the merge point earlier in the pipeline.
-Specialist agents should return structured evidence, not full prose answers. The main workflow should
-deduplicate, rerank, reconcile, and select evidence centrally, then call one final writer model once.
+Source-specific components should be thin retrieval tools that return structured evidence, not full
+prose answers. The main workflow should deduplicate, rerank, reconcile, and select evidence centrally,
+then call one final writer model once.
 
 ## Current pattern causing latency
 
 The slower pattern usually looks like this:
 
 1. User asks a question.
-2. Main agent decides several specialist agents are needed.
-3. Specialist agent A runs RAG and writes an answer.
-4. Specialist agent B runs RAG and writes an answer.
-5. Specialist agent C runs RAG and writes an answer.
+2. Main agent decides several answer-writing subagents are needed.
+3. Subagent A runs RAG and writes an answer.
+4. Subagent B runs RAG and writes an answer.
+5. Subagent C runs RAG and writes an answer.
 6. A merge agent reads those answers.
 7. The merge agent may call another RAG path or another model to produce the final answer.
 
-Each individual agent response may be good, but the end-to-end system pays for multiple retrieval
+Each individual subagent response may be good, but the end-to-end system pays for multiple retrieval
 calls, multiple generation calls, larger merge context, duplicated evidence, and another synthesis
 step.
 
@@ -47,14 +48,14 @@ Use this shape instead:
 9. Call one grounded writer model.
 10. Verify and bind citations.
 
-The key difference is that source specialists become thin retrieval tools. They retrieve evidence from
-their source, but they do not independently write final answers.
+The key difference is that source-specific components become thin retrieval tools. They retrieve
+evidence from their source, but they do not independently write final answers.
 
 ## Why merging answers is expensive
 
 Merging agent-written prose creates several problems:
 
-- every source agent spends tokens writing prose that may later be discarded
+- every answer-writing subagent spends tokens writing prose that may later be discarded
 - the merge agent receives larger context than necessary
 - duplicate facts appear in multiple agent responses
 - contradictions are embedded inside prose instead of explicit data
@@ -63,9 +64,9 @@ Merging agent-written prose creates several problems:
 
 This increases latency and can reduce trust.
 
-## What each specialist should return
+## What each retrieval tool should return
 
-Each source specialist should return structured evidence like:
+Each source-scoped retrieval tool should return structured evidence like:
 
 - source name
 - artifact ID
@@ -128,9 +129,9 @@ Capture the number of model calls, retrieval calls, per-agent latency, merge lat
 volume, duplicate evidence rate, citation precision, and examples where the merge loses important
 details.
 
-### Phase 2: Change specialist outputs
+### Phase 2: Change source-component outputs
 
-Convert specialist agents from answer writers into evidence-returning tools. Each should return top
+Convert answer-writing subagents into evidence-returning retrieval tools. Each should return top
 evidence records with metadata, not prose.
 
 ### Phase 3: Add global ranking
@@ -149,8 +150,8 @@ model.
 
 ## Quick wins if a full redesign is not possible yet
 
-- Ask source agents for cited bullet facts instead of full answers.
-- Limit each source agent to a strict token, chunk, citation, and latency budget.
+- Ask source components for cited bullet facts instead of full answers.
+- Limit each source retrieval tool to a strict candidate, citation, and latency budget.
 - Merge only facts that are tied to citations.
 - Cache retrieval results and normalized evidence.
 - Avoid merge-time RAG unless the upstream evidence contract is insufficient.

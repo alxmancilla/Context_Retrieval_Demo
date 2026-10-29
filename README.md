@@ -1,145 +1,123 @@
 # AI Context Platform Assistant — MongoDB Demo
 
-A source-aware, deterministic agentic RAG workflow that simulates GitHub, Confluence, Jira,
-SharePoint, and Teams using MongoDB Atlas collections. A LangGraph coordinator
-fans out to thin retrieval specialists, then centrally reconciles authority,
-freshness, and explicit contradictions before asking the configured chat provider for a grounded,
-cited answer.
+This demo shows how MongoDB Atlas can be the shared retrieval, governance, and state layer for an
+agentic RAG workflow.
 
-## Key design choices
+The customer scenario is a healthcare enterprise assistant that answers questions across simulated
+GitHub, Confluence, Jira, SharePoint, and Teams content. The workflow retrieves evidence from the
+right sources, reconciles conflicts deterministically, and then asks one model to write one cited
+answer.
 
-- One MongoDB collection per simulated enterprise island.
-- In-process, MCP-shaped source tools in Phase 1; their descriptors live in the
-  `sources` registry so a real MCP transport can replace them later.
-- Atlas Automated Embedding indexes use Voyage `voyage-4`. Documents contain
-  business data and metadata; vectors are generated and managed inside Atlas Search indexes,
-  so source documents do **not** expose an `embedding` array field.
-- Each source combines ACL-filtered semantic and lexical retrieval with MongoDB
-  `$rankFusion`, improving recall for both concepts and exact identifiers.
-- `SOURCE_RETRIEVAL_MODE=hybrid` is the default. Demo operators can temporarily switch to
-  `vector` or `lexical` to show what each retrieval path misses before returning to hybrid.
-- `SOURCE_ROUTING_MODE=intent` is the default. Demo operators can compare it with `all`
-  and `explicit_only` to test whether source routing complexity improves quality or latency.
-- Voyage `rerank-3` globally reranks ACL-filtered candidates before deterministic
-  reconciliation. Atlas vector similarity remains the fallback if reranking is unavailable.
-- Source truth score defaults to 55% semantic relevance, 30% authority, and 15%
-  freshness. The three validated `RECONCILIATION_*_WEIGHT` settings support calibrated
-  profiles and must sum to `1.0`.
-- Contradictions are detected from ACL-scoped records in the indexed `claim_assertions` collection.
-- Protected artifact governance distinguishes policy, implementation, runbook, and historical incident
-  evidence; contradiction decisions include representatives, lifecycle status, and score margin.
-- MongoDB stores LangGraph checkpoints plus auto-embedded, user-scoped semantic
-  memory. A deterministic write gate retains only explicit user preferences, decisions, and
-  task context; ordinary enterprise Q&A is not promoted to durable memory.
-- Recent checkpoint turns and governed durable memory are retrieved in parallel. Older messages
-  are compacted into a bounded summary, and neither context source outranks enterprise evidence.
-  Recent context is role-normalized, user/assistant-only, citation-preserving, and avoids splitting
-  user/assistant turn boundaries during compaction.
-- All persisted and retrieved records are scoped by `realm_id`; memory also uses
-  `user_id`.
+The core message is:
 
-## Architecture
+> **Merge evidence, not answers.**
 
-`validated identity → source routing → parallel recent/durable context + hybrid retrieval tools →
-Voyage reranking → deterministic reconciliation → chat-provider grounded writer → selective memory → compaction`
+Instead of asking multiple answer-writing subagents to each generate prose and then calling another
+agent to merge those answers, this demo retrieves source evidence in parallel, ranks and reconciles it
+centrally, and generates once from governed, cited context.
 
-See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the complete component diagram, retrieval
-sequence, MongoDB/Voyage rationale, resilience paths, and validation status.
-See [`SECURITY.md`](SECURITY.md) for provider data flows and production release gates.
-See [`OPERATIONS.md`](OPERATIONS.md) for readiness, SLO, restore, deletion, and incident procedures.
-See [`profiles/README.md`](profiles/README.md) for adapting the demo to other customer scenarios
-while reusing the same hybrid retrieval, reranking, governance, citation, and memory pipeline.
-See [`docs/routing-retrieval-benchmark.md`](docs/routing-retrieval-benchmark.md) for empirical
-comparison of routing/retrieval modes, and [`docs/production-readiness.md`](docs/production-readiness.md)
-for the index inventory, ingestion lifecycle, failure-mode script, and production boundaries.
+In this repository, the coordinator calls thin source-scoped retrieval tools, not independent
+answer-generating subagents. Each tool returns MongoDB evidence only; the final answer is written once
+after reranking and reconciliation.
 
-## Reusable demo profile pattern
+## Use case
 
-The healthcare corpus is one profile on top of a reusable architecture. Other customer demos can
-keep the core pipeline unchanged and swap the profile assets:
+Many enterprise RAG implementations become slow when a main agent calls several answer-writing
+subagents and then waits for a separate merge step. The individual subagent answers may be good, but
+the final synthesis adds latency and can make citations, authority, and stale-source handling harder
+to explain.
 
-- source artifacts and metadata
-- source authority and freshness settings
-- normalized claim keys and contradiction examples
-- starter prompts and live demo script
-- deterministic eval cases
-- customer-facing presentation narrative
+This demo shows a better pattern:
 
-The Chainlit **Retrieval pipeline** side-panel inspector makes the reusable value visible by showing
-the active source-routing and source-retrieval modes, Automated Embedding, hybrid `$rankFusion`,
-Voyage `rerank-3`, source counts, contradiction counts, fallbacks, and degraded markers for each turn.
+1. Route the question to relevant enterprise sources.
+2. Retrieve authorized evidence from selected sources in parallel.
+3. Use MongoDB Atlas Search, Vector Search, and `$rankFusion` to produce strong candidates.
+4. Rerank authorized candidates with Voyage `rerank-3`.
+5. Reconcile evidence using source authority, freshness, lifecycle status, and normalized claims.
+6. Generate one final cited answer.
 
-## Customer sample-question source map
+The healthcare profile includes questions about Rx API authentication, prior authorization event
+delivery, eligibility-cache TTLs, and PHI-safe troubleshooting. The same architecture can be reused
+for other customer profiles by changing source artifacts, authority rules, prompts, and evaluations.
 
-The Chainlit launcher is organized around the customer story: use MongoDB to reduce multi-agent RAG
-latency by merging governed evidence before generating one answer. The sample questions are grouped
-into **MongoDB latency wins**, **Governed evidence demos**, and **Production readiness**.
+## MongoDB value proposition
 
-Each question can retrieve from multiple simulated enterprise systems. The source systems are thin
-retrieval specialists; they return evidence, not independent prose answers. MongoDB Atlas provides the
-common retrieval plane across all of them.
+MongoDB Atlas is used as the operational context plane for the assistant:
 
-The seed corpus also writes one **customer-demo source-map** artifact into each corresponding Atlas
-source collection. Those records make the new launcher questions directly retrievable from `github`,
-`confluence`, `jira`, `sharepoint`, and `teams` instead of documenting the story only in this README.
+| Capability | MongoDB value in this demo |
+|---|---|
+| Multi-source evidence | Five Atlas collections simulate GitHub, Confluence, Jira, SharePoint, and Teams. |
+| Hybrid retrieval | Atlas Vector Search and Atlas Search are fused with `$rankFusion`. |
+| Managed embeddings | Atlas Automated Embedding uses Voyage `voyage-4` on the `content` field; documents do not store visible embedding arrays. |
+| Governance | Protected governance records add document type, lifecycle status, source authority, and optional authority overrides. |
+| Conflict handling | Indexed claim assertions let the app compare stale and current claims deterministically. |
+| Security filtering | Retrieval applies `realm_id` and `access_principals` before candidates are ranked. |
+| Conversation state | MongoDB stores LangGraph checkpoints and governed semantic memory. |
+| Auditability | Final answers are bound only to retrieved MongoDB artifacts, not unsupported model summaries. |
 
-| Source | What it represents in the demo | Why it matters for the new questions |
+The practical value for customers is lower latency, clearer citations, deterministic conflict handling,
+and a reusable architecture for production-style enterprise RAG.
+
+## What the demo proves
+
+- **Latency pattern:** source retrieval can fan out in parallel without waiting for multiple answer-writing agents.
+- **Tool boundary:** source-specific components are retrieval tools that return evidence, not prose answers.
+- **Governed answers:** policy, implementation, runbook, incident, and discussion evidence can be ranked consistently.
+- **Stale-source handling:** old Confluence or Teams guidance can remain visible without winning over current GitHub, Jira, or SharePoint evidence.
+- **Targeted routing:** prompts can intentionally search all five sources, or only two or three named sources.
+- **Citations:** factual claims in the final response are rebound to verified source artifacts.
+- **Operational transparency:** the UI shows a Pipeline Trace with routing, retrieval, reranking, reconciliation, and top evidence.
+
+## Demo source systems
+
+The source systems are simulated with MongoDB Atlas collections. Each one has realistic metadata,
+governance, ACLs, and source-specific evidence.
+
+| Source | Represents | Best for showing |
 |---|---|---|
-| GitHub | Current implementation evidence: code paths, pull requests, commits, service configuration, and deployment changes. | Helps prove what is actually implemented today, especially for OAuth 2.0 + PKCE, PA event delivery, eligibility cache changes, and citation-backed current-state answers. |
-| Confluence | Architecture pages, design notes, migration guides, and sometimes stale reference material. | Useful for explaining design intent and for demonstrating why older documentation can lose to fresher implementation or policy evidence during reconciliation. |
-| Jira | Delivery records, incidents, rollout tickets, remediation work, and status transitions. | Supports timeline and operational questions such as proving latency improvements, tracing eligibility cache decisions, and showing PA migration progress. |
-| SharePoint | Policy, compliance, security, network-control, and runbook artifacts. | Provides authoritative governance evidence for production readiness, partner connectivity controls, PHI-safe troubleshooting, and auditability. |
-| Teams | Operational discussions, incident coordination, rollout notes, and informal guidance. | Helps demonstrate contradiction handling because Teams may contain useful operational context as well as stale or lower-authority claims. |
+| GitHub | Current implementation evidence, commits, service configuration, tests. | What is actually deployed now. |
+| Confluence | Architecture pages, design notes, migration guidance, sometimes stale docs. | Design history and stale-vs-current comparisons. |
+| Jira | Incidents, rollout tickets, delivery status, remediation records. | Timelines, acceptance evidence, and operational change history. |
+| SharePoint | Policies, standards, compliance docs, production runbooks. | Official governance and production-readiness controls. |
+| Teams | Operational discussions, incident coordination, informal guidance. | Useful context that may be lower authority or stale. |
 
-The intended customer takeaway is that MongoDB lets the assistant compare all of these evidence types
-inside one governed workflow:
+The seeded corpus contains `805` artifacts: `161` in each source collection. It includes the original
+healthcare scenario records plus five customer-demo source-map artifacts describing the MongoDB-backed
+agentic RAG latency story.
 
-1. **Route** to the sources likely to contain useful evidence.
-2. **Retrieve** authorized candidates from each source in parallel.
-3. **Fuse and rerank** evidence using Atlas Search, Vector Search, `$rankFusion`, and Voyage reranking.
-4. **Reconcile** with authority, freshness, lifecycle status, and normalized claims.
-5. **Generate once** from ranked, cited evidence.
+## Recommended demo flow
 
-### How the new launcher questions use the sources
+Start the UI and use the sample cards in this order:
 
-- **Reduce multi-agent RAG latency** uses all source types to show why retrieval fan-out plus one final
-  writer call is faster and clearer than answer-generating specialist agents plus a merge agent.
-- **Merge evidence, not answers** highlights Atlas Search, Vector Search, and `$rankFusion` across
-  GitHub, Confluence, Jira, SharePoint, and Teams before final synthesis.
-- **One retrieval plane** emphasizes MongoDB as the shared layer for source metadata, evidence search,
-  vector retrieval, checkpoints, memory, and audit trails.
-- **Prove latency improvement** points to routing and retrieval benchmarks that compare `intent`, `all`,
-  and `explicit_only` routing against `hybrid`, `vector`, and `lexical` retrieval modes.
-- **Resolve the OAuth conflict** compares current GitHub implementation evidence, Jira rollout status,
-  Confluence architecture notes, and Teams discussions to show why the authoritative current answer wins.
-- **Trace the cache decision** combines Jira incident context, GitHub implementation evidence,
-  Confluence design history, and policy/runbook artifacts to produce a cited timeline.
-- **PHI-safe troubleshooting** demonstrates why SharePoint policy evidence can outrank informal Teams
-  troubleshooting suggestions while still preserving historical context.
-- **Verify answer citations** shows that factual claims must bind back to retrieved MongoDB artifacts,
-  not model-generated source summaries.
-- **Atlas controls for partners** emphasizes SharePoint policy, architecture evidence, and implementation
-  artifacts for network, encryption, and access-control readiness.
-- **Checkpoint and memory value** shows MongoDB checkpoints and semantic memory as conversation context,
-  while keeping enterprise source evidence as the factual authority.
-- **Prior auth event resilience** connects Jira operational tickets, GitHub implementation changes,
-  runbooks, and Teams incident coordination around idempotency, lag, failures, and recovery.
-- **Executive value summary** rolls up the full story: latency reduction, governed retrieval, citations,
-  auditability, and production operations.
+1. **Rx auth current state** — shows stale vs current evidence across source systems.
+2. **GitHub + Jira auth proof** — shows targeted 2-source routing.
+3. **GitHub + Jira + Teams PA events** — shows targeted 3-source routing and operational follow-up.
+4. **Merge evidence, not answers** — frames the MongoDB latency and architecture value proposition.
+5. **Executive value summary** — produces a customer-ready summary of latency, governance, citations,
+   auditability, and operations.
 
-## Contradiction behavior
+## Sample questions
 
-- Indexed claim assertions group artifacts that make competing assertions about the same fact.
-- Reconciliation preserves every supporting artifact ID for audit but selects one scored
-  representative for each competing value.
-- Representatives include document type, lifecycle status, update timestamp, and truth score.
-- Artifact authority overrides let an effective policy outrank an implementation record while
-  retaining source-level authority as the default.
-- The cross-value score margin makes the strength of the deterministic decision explicit.
-- The configured chat provider receives each representative, including low-ranked historical evidence, so it
-  can distinguish an old incident suggestion from an approved policy or established practice.
-- The Sources appendix is limited to cited, preferred, and representative artifacts instead of
-  listing every corroborating document.
+### Original healthcare tests
+
+- `How do external partners authenticate to the Rx API today, and are any sources outdated?`
+- `For prior auth, should clients poll for status or consume events? What changed and when?`
+- `Build a timeline from the 60-minute eligibility cache design to the current deployment. Cite the incident, ticket, and implementation.`
+- `What is the documented PHI logging policy, and how does it differ from old troubleshooting practices?`
+
+### Targeted source-routing tests
+
+- `Look only in GitHub and Jira. What proves Rx API OAuth 2.0 with PKCE is implemented and deployed?`
+- `Look only in SharePoint and Confluence. What is the official PHI logging policy, and how does it compare with troubleshooting guidance?`
+- `Look only in GitHub, Jira, and Teams. What changed from prior auth polling to status events, and what operational follow-up is visible?`
+- `Look only in Confluence, Jira, and GitHub. Build the eligibility cache timeline from original design to deployed implementation.`
+
+### MongoDB value questions
+
+- `For this customer scenario, how does MongoDB Atlas help replace answer-generating subagents with thin retrieval tools, central reconciliation, and one final grounded answer?`
+- `Show how Atlas Search, Vector Search, and rank fusion can merge evidence from GitHub, Confluence, Jira, SharePoint, and Teams before the final LLM call.`
+- `What is the benefit of using MongoDB as the shared metadata, search, vector, checkpoint, and memory layer for this agentic RAG workflow?`
+- `How should we benchmark intent routing, all-source retrieval, and explicit source selection to prove the MongoDB-backed workflow lowers end-to-end latency?`
 
 ## Prerequisites
 
@@ -155,226 +133,150 @@ inside one governed workflow:
 Automated Embedding is currently an Atlas Public Preview capability. Ensure the
 cluster region supports it before bootstrapping.
 
-## Environment and dependencies
+## How to run the demo
 
-`pyproject.toml` defines direct runtime dependencies and a separate development group;
-`uv.lock` pins the complete environment. Reproduce it with
-`uv sync --frozen --group dev`. The legacy `requirements.txt` freeze remains available
-for pip environments and matches every overlapping locked version. Ruff, mypy, and
-pytest configuration lives in `pyproject.toml` and the tools are pinned in the development
-dependency group.
+### 1. Configure environment
 
-Run the local quality gates with `uv run ruff check .` and `uv run pytest -q`. Validate
-the supported Python floor with `uv run --isolated --python 3.11 --frozen --group dev
-mypy agent core data db evals scripts ui app.py chainlit_app.py`.
+Copy the example environment file:
 
-## Setup
+```bash
+cp .env.example .env
+```
 
-1. Copy `.env.example` to `.env` and fill in `MONGODB_URI`, `VOYAGE_API_KEY`, and one
-   chat provider profile:
-   - Grove: `CHAT_PROVIDER=grove`, `GROVE_API_KEY`, `GROVE_BASE_URL`, `GROVE_MODEL`.
-   - OpenAI: `CHAT_PROVIDER=openai`, `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL`.
-2. Install with `uv sync --frozen --group dev`, or use
-   `.venv/bin/python -m pip install -r requirements.txt` for the legacy pip workflow.
-3. Seed 805 artifacts, protected governance and claim records, validators, five lexical indexes,
-   five Automated Embedding indexes, and one memory index:
-   `.venv/bin/python app.py bootstrap --wait`
-4. Ask a contradiction-rich demo question:
-   `.venv/bin/python app.py ask "How does the Rx API authenticate partners, and is any source stale?"`
+Fill in:
 
-## Chatbot UI
+- `MONGODB_URI`
+- `VOYAGE_API_KEY`
+- Grove settings: `CHAT_PROVIDER=grove`, `GROVE_API_KEY`, `GROVE_BASE_URL`, `GROVE_MODEL`
+- Or OpenAI settings: `CHAT_PROVIDER=openai`, `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL`
 
-Start the Chainlit interface with:
+Useful demo defaults:
 
-`.venv/bin/chainlit run chainlit_app.py --host 127.0.0.1 --port 8000`
+```bash
+SOURCE_RETRIEVAL_MODE=hybrid
+SOURCE_ROUTING_MODE=intent
+SOURCE_TOP_K=5
+AUTH_MODE=disabled
+```
 
-Open `http://127.0.0.1:8000`. Each chat receives a MongoDB-checkpointed thread and
-shows coordinator routing, parallel source-agent retrieval, truthiness scoring,
-contradictions, citations, degraded capabilities, and semantic memory in expandable
-steps and side-panel inspectors. In local mode, chat-provider tokens stream through LangGraph's custom
-event channel under an explicit unverified-draft label; production buffers them until the
-application binds verified source links to the completed answer.
+### 2. Install dependencies
 
-The UI includes an explicit **Architecture** header link and a README/welcome preview that open
-`/public/solution-architecture.png`. The rendered SVG/PNG assets match the Mermaid source diagram,
-including `Source Routing` with `intent | all | explicit` modes. The architecture diagram is
-intentionally not attached as an automatic side tab on every chat; users open it only when they want
-the visual design reference.
-Use `/health` for process liveness and `/ready` for MongoDB/index readiness, content-free
-connection-pool and memory counters, and active agent/prompt/embedding version identifiers.
+Recommended:
 
-## Embeddings and reranking
+```bash
+uv sync --frozen --group dev
+```
 
-This demo uses embeddings through **Atlas Automated Embedding**, not through visible vector fields
-stored in the documents. The embedded text path is `content`.
+Legacy pip workflow:
 
-| Collection(s) | Vector Search index | Embedded path | Model | Visible vector field? |
-|---|---|---|---|---|
-| `github`, `confluence`, `jira`, `sharepoint`, `teams` | `content_vector_acl` | `content` | `voyage-4` | No |
-| `memories` | `memory_vector_retained` | `content` | `voyage-4` | No |
+```bash
+.venv/bin/python -m pip install -r requirements.txt
+```
 
-The five source collections also have lexical Atlas Search indexes named `content_lexical` for
-exact terms, IDs, titles, and artifact identifiers. Source retrieval runs semantic Vector Search
-and lexical Search with tenant/ACL filters, then combines them with `$rankFusion`. Voyage
-`rerank-3` reranks only the already-authorized candidates returned by Atlas. The final governing
-answer is then selected by deterministic reconciliation, not by the embedding or reranker model.
+### 3. Seed Atlas
 
-For customer demos, `SOURCE_RETRIEVAL_MODE` can be set to:
+```bash
+.venv/bin/python app.py bootstrap --wait
+```
 
-- `hybrid` — default production-style path: vector + lexical + `$rankFusion`.
-- `vector` — semantic Vector Search only, useful for showing paraphrase recall.
-- `lexical` — keyword Search only, useful for showing exact-term and ID recall.
+This upserts the source artifacts, protected governance records, claim assertions, validators, five
+lexical indexes, five Automated Embedding indexes, and one memory index.
 
-Use comparison modes only for demonstration and troubleshooting; the recommended default remains
-`hybrid`.
+Expected corpus size:
 
-For architecture ablations, `SOURCE_ROUTING_MODE` can be set to:
+- `805` total source artifacts
+- `161` artifacts in each source collection
+- `805` governance records
+- `805` claim assertions
 
-- `intent` — default path: the chat provider parses intent and selects sources.
-- `all` — retrieves every source, useful for comparing quality and latency against routing.
-- `explicit_only` — uses source names mentioned in the prompt, otherwise falls back to all sources.
+### 4. Run the Chainlit UI
 
-Use this to verify whether source routing earns its extra model call for a given profile.
+```bash
+.venv/bin/chainlit run chainlit_app.py --host 127.0.0.1 --port 8000
+```
 
-The default connection timeouts are tuned for this low-concurrency demo: Atlas server
-selection fails after 5 seconds, connection establishment after 10 seconds, and an
-in-flight operation after 60 seconds. Override the corresponding `MONGODB_*_TIMEOUT_MS`
-variables after measuring production network and query latency.
+Open:
 
-Run `.venv/bin/python -m scripts.smoke_ui` to exercise the same asynchronous
-LangGraph, Atlas, chat-provider, checkpoint, and memory path used by the UI.
+```text
+http://127.0.0.1:8000
+```
 
-### Prompt evaluation catalog
+Each response includes a customer-visible **Pipeline Trace** before the final cited answer. Use it to
+show source routing, candidate counts, reranking, reconciliation, and top evidence.
 
-**Current-state and contradiction tests**
+### 5. Ask from the CLI
 
-- `How do external partners authenticate to the Rx API today, and are any sources outdated?`
-- `Compare OAuth claims in GitHub, Jira, Confluence, and Teams. Which claim wins under authority and freshness, and why?`
-- `For prior auth, should clients poll for status or consume events? What changed and when?`
-- `What is the documented PHI logging policy, and how does it differ from old troubleshooting practices?`
+```bash
+.venv/bin/python app.py ask "How do external partners authenticate to the Rx API today, and are any sources outdated?"
+```
 
-**Architecture and operations tests**
+## Demo switches
 
-- `What Atlas network and transport controls are required for production Rx partner connectivity, and which evidence verifies them?`
-- `How does prior authorization event delivery handle idempotency, stream lag, failures, and dead-letter processing?`
-- `What are the positive and negative eligibility cache TTLs, and why are they different?`
-- `How should engineers troubleshoot a PHI-related production incident without logging raw payloads?`
+### Source routing
 
-**Evidence and timeline tests**
+Set `SOURCE_ROUTING_MODE` to compare routing behavior:
 
-- `Build a timeline from the 60-minute eligibility cache design to the current deployment. Cite the incident, ticket, and implementation.`
-- `Summarize evidence that tier-1 prior authorization consumers migrated from polling to events and identify any remaining exceptions.`
-- `Which artifacts prove that OAuth 1.0 support was removed, and which stale artifacts still claim it is required?`
-- `Separate policy, architecture, implementation, rollout, and incident evidence for PHI-safe logging.`
+- `intent` — default; the chat provider selects relevant sources.
+- `all` — retrieves from all five sources for broad comparison.
+- `explicit_only` — uses source names explicitly mentioned in the prompt, otherwise falls back to all sources.
 
-**Enterprise portfolio tests**
+### Retrieval mode
 
-- `Across Partner Integration Gateway, Member API, and Provider API, summarize current authentication controls using implementation, architecture, rollout, and compliance evidence.`
-- `Which applications have rollout and operational evidence for event-driven prior authorization status delivery?`
-- `Compare eligibility cache controls for Member Portal, Benefits Engine, and Pharmacy Transaction Hub.`
-- `Create an executive risk brief covering Rx authentication, prior auth delivery, eligibility caching, and PHI logging. Surface stale or contradictory guidance.`
+Set `SOURCE_RETRIEVAL_MODE` to compare candidate generation:
 
-**Multi-turn context test**
+- `hybrid` — default; Vector Search + lexical Search + `$rankFusion`.
+- `vector` — semantic Vector Search only.
+- `lexical` — keyword Atlas Search only.
 
-1. Ask `How do external partners authenticate to the Rx API today?`
-2. Follow with `Which source in your previous answer was stale, and why did it lose?`
-3. Then ask `Apply the same authority and freshness reasoning to the eligibility cache decision.`
+For customer demos, use `hybrid` as the main path and temporarily switch modes only to explain tradeoffs.
 
-Follow-ups use bounded checkpoint context, not durable memory. The context pack excludes tool and
-system payloads, removes the current query from prior context, preserves prior citation labels such
-as `[jira:PA-44]`, and truncates long turns from the middle so both the setup and citations survive.
+## Validation commands
 
-The corpus contains 200 artifacts for each healthcare scenario, plus five customer-demo source-map
-artifacts for the MongoDB-backed agentic RAG latency story. There are 161 artifacts in each of
-GitHub, Confluence, Jira, Teams, and SharePoint. The latest 160-record assurance expansion
-adds policy, architecture, implementation, validation, runbook, compliance, deprecation,
-and operations evidence. All records include stable fake source URLs, realistic source
-metadata, governance, official MongoDB documentation references, linked records, and
-deliberately stale claims. Expected winners are the current GitHub implementations for Rx
-OAuth 2.0 + PKCE, PA event delivery, and the five-minute eligibility TTL; the effective
-SharePoint policy governs PHI log redaction.
+Run local tests:
 
-## Data and source routing
+```bash
+.venv/bin/python -m pytest -q
+```
 
-The seed operation is idempotent: artifacts and registry rows are upserted by
-realm and stable identifier. Synthetic links intentionally use `demo.cmm.local`
-to make clear that the source systems are simulated. Production connectors or
-MCP servers can write the same normalized envelope without changing downstream
-reconciliation.
+Run lint and type checks:
 
-## Repository hygiene
+```bash
+.venv/bin/ruff check .
+.venv/bin/mypy agent core data db evals scripts ui app.py chainlit_app.py
+```
 
-Initialize local version control with `git init --initial-branch=main`. Keep `.env`,
-virtual environments, caches, logs, private keys, exported credentials, and build
-outputs outside source control; the included `.gitignore` covers these paths. Before
-the first commit, run `git status --short --ignored` and confirm that `.env` is ignored
-while `.env.example` remains visible. Never commit or paste values from `.env`.
+Check Atlas schema, indexes, and counts without printing document content:
 
-## Tests
+```bash
+.venv/bin/python -m scripts.check_schema
+```
 
-Run `.venv/bin/python -m pytest`. Unit tests use in-memory fakes and require no
-Atlas, Voyage, Grove, or OpenAI credentials. External integration tests are skipped normally.
+Run a UI smoke test:
 
-To verify Atlas index readiness, ACL and retention filters, Voyage reranking, chat-provider typed
-and streaming response shapes, and Chainlit startup on an ephemeral port, run
-`RUN_LIVE_INTEGRATION=1 .venv/bin/python -m pytest tests/integration -q`.
-The live profile reads credentials from `.env`, never command-line arguments, and does
-not print model responses, document content, or secrets.
+```bash
+.venv/bin/python -m scripts.smoke_ui
+```
 
-Run the deterministic RAG evaluation baseline with `.venv/bin/python -m evals.runner`.
-It records metric-only results under ignored `evals/results/`: expected claim winner,
-representative selection, required-term coverage, verified citation precision, concise-source
-limits, stale-evidence identification, latency budget, and safe degradation. The exact PHI
-policy case requires the effective SharePoint policy to win, the historical Teams suggestion
-to remain grounded, and no more than six appendix artifacts. This is a transparent regression
-proxy, not a substitute for expert review or a calibrated faithfulness judge.
+Run routing/retrieval benchmark comparisons:
 
-Run `.venv/bin/python -m evals.retrieval_runner` for four additional assurance-control
-retrieval checks covering JWKS rotation, PA dead-letter replay, eligibility invalidation, and
-break-glass PHI logging. Run `.venv/bin/python -m scripts.load_retrieval --rounds 3 --workers 5`
-for a bounded, metric-only concurrent Atlas retrieval smoke; it prints no document content.
-Run `.venv/bin/python -m scripts.benchmark_modes` when you need a metric-only comparison of
-`SOURCE_ROUTING_MODE` and `SOURCE_RETRIEVAL_MODE` choices; results are written under ignored
-`evals/results/` paths.
+```bash
+.venv/bin/python -m scripts.benchmark_modes
+```
 
-Current validated baseline: **141 default-profile tests pass with four skipped**, Ruff and Python
-3.11 mypy pass, **4/4 live RAG cases pass**, and **4/4 assurance retrieval cases pass**. The rendered
-architecture SVG/PNG assets are refreshed and served by Chainlit when the local demo is running.
+## Related docs
+
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) — architecture diagram and implementation details
+- [`docs/customer-agentic-rag-latency-guidance.md`](docs/customer-agentic-rag-latency-guidance.md) — customer explanation of the latency pattern
+- [`docs/customer-pipeline-code-walkthrough.md`](docs/customer-pipeline-code-walkthrough.md) — code walkthrough for routing, retrieval, reranking, and reconciliation
+- [`docs/routing-retrieval-benchmark.md`](docs/routing-retrieval-benchmark.md) — benchmark methodology
+- [`docs/production-readiness.md`](docs/production-readiness.md) — production boundaries and readiness checks
+- [`SECURITY.md`](SECURITY.md) — security and production release gates
+- [`OPERATIONS.md`](OPERATIONS.md) — readiness, restore, deletion, and incident procedures
 
 ## Security note
 
-This is a demo. Production requires source-level authorization propagation,
-permission-aware retrieval, audit retention, secret management, PII controls,
-and evaluation gates. Never commit `.env`; do not introduce real PHI until every gate in
-[`SECURITY.md`](SECURITY.md) is satisfied.
+This is a demo. Do not use real PHI or production secrets. Production use requires source-level
+authorization propagation, OAuth/OIDC identity, permission-aware retrieval, audit retention, secret
+management, PII controls, and evaluation gates.
 
-Source retrieval now enforces both `realm_id` and an indexed intersection with each
-artifact's `access_principals`. Local mode uses `ACCESS_PRINCIPALS`; set
-`AUTH_MODE=password`, `AUTH_USERNAME`, `AUTH_PASSWORD`, and a strong
-`CHAINLIT_AUTH_SECRET` to enable Chainlit's local password callback. Password mode is
-for controlled demonstrations only. Production requires `AUTH_MODE=oauth`, an
-`OAUTH_ALLOWED_PROVIDERS` allowlist, and validated realm/group claim mappings.
-
-Chainlit defaults to localhost-only origins, disabled uploads, a 30-minute connection
-session, and 24-hour user-session expiry. `APP_ENV=production` refuses non-OAuth auth,
-buffers unverified draft tokens, and requires HTTPS for external chat providers.
-Password-mode signing secrets must be non-placeholder values of at least 32 characters.
-For deployment, replace the localhost origins with the
-exact HTTPS application origin and integrate enterprise OAuth/OIDC before exposure.
-
-Application degradation is emitted as structured JSON with event, correlation ID,
-graph node, source, exception type, and degraded capability. Prompts, retrieved content,
-credentials, and raw exception text are excluded. Configure `LOG_LEVEL`,
-`GROVE_TIMEOUT_SECONDS`, `GROVE_MAX_RETRIES`, `OPENAI_TIMEOUT_SECONDS`,
-`OPENAI_MAX_RETRIES`, `VOYAGE_RERANK_TIMEOUT_SECONDS`, and `VOYAGE_RERANK_MAX_RETRIES`
-for the deployment environment.
-
-Durable memories are selectively written, redacted, typed, importance-scored, semantically
-merged or reinforced, versioned, provenance-tagged, capped per user, and filtered by tenant,
-user, type, validity, tombstone, and expiry. Deletion immediately suppresses and redacts both
-content and summary; TTL later removes the document. Chainlit reuses one process-level MongoDB
-client instead of creating a connection pool per chat session.
-Pool size and wait-queue limits are configurable, and `/ready` exposes only counters.
-LangGraph checkpoints use `CHECKPOINT_RETENTION_DAYS`. To exercise the confirmed
-deletion path, run `.venv/bin/python app.py forget --confirm`; use `--user-id` only as
-an authorized realm administrator.
+Never commit `.env` or paste secrets into prompts, shell commands, logs, tickets, or documentation.

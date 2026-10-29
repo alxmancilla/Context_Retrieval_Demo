@@ -36,7 +36,9 @@ Core components:
 
 ![Solution architecture](../public/solution-architecture.png)
 
-Key idea: generation is only the final step. Retrieval, filtering, ranking, governance, and citation binding happen before the answer is presented.
+Key idea: generation is only the final step. The coordinator calls retrieval tools, not independent
+answer-generating subagents. Retrieval, filtering, ranking, governance, and citation binding happen
+before the answer is presented.
 
 ---
 
@@ -94,6 +96,9 @@ For each selected source:
 3. Run lexical retrieval through Atlas Search.
 4. Combine both rankings with MongoDB `$rankFusion`.
 5. Return only authorized candidates.
+
+The source tool returns evidence records only. It does not call a writer model or produce a prose
+answer for a merge agent.
 
 `$rankFusion` is used because vector and lexical scores are not naturally comparable.
 
@@ -289,7 +294,7 @@ Validation covers multiple layers:
 
 Current status: deterministic live RAG gates and assurance retrieval gates pass **4/4**. The rendered
 architecture assets are refreshed to show `Source Routing` with `intent`, `all`, and `explicit_only`
-comparison modes.
+comparison modes, plus thin source retrieval tools that return evidence only.
 
 ---
 

@@ -47,19 +47,24 @@ def test_starter_catalog_covers_enterprise_evaluation_scenarios():
     labels = [label for label, _ in STARTER_PROMPTS]
     messages = [message for _, message in STARTER_PROMPTS]
 
-    assert len(SAMPLE_QUESTION_GROUPS) == 3
-    assert len(STARTER_PROMPTS) == 12
+    assert len(SAMPLE_QUESTION_GROUPS) == 5
+    assert len(STARTER_PROMPTS) == 20
     assert len(labels) == len(set(labels))
     assert len(messages) == len(set(messages))
     combined = " ".join(messages).lower()
-    for topic in ("mongodb", "latency", "atlas", "vector", "citations", "auditability"):
+    for topic in (
+        "mongodb", "latency", "atlas", "vector", "citations", "auditability",
+        "oauth", "prior auth", "eligibility", "phi", "look only", "github and jira",
+        "sharepoint and confluence",
+    ):
         assert topic in combined
 
 
 def test_starter_categories_group_sample_questions():
     categories = asyncio.run(starter_categories(None))
     assert [category.label for category in categories] == [
-        "MongoDB latency wins", "Governed evidence demos", "Production readiness"
+        "Original healthcare tests", "Targeted source-routing tests",
+        "MongoDB latency wins", "Governed evidence demos", "Production readiness",
     ]
     assert sum(len(category.starters) for category in categories) == len(STARTER_PROMPTS)
 

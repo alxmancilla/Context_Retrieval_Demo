@@ -12,14 +12,17 @@ The key customer message is:
 > Merge evidence, not answers.
 
 
-The workflow retrieves and ranks evidence before making one final LLM call. This avoids the slower pattern where multiple agents each generate full answers and another agent merges those answers.
+The workflow retrieves and ranks evidence before making one final LLM call. This avoids the slower
+pattern where multiple answer-generating subagents each produce full answers and another agent merges
+those answers. In this demo, selected source components are thin retrieval tools that return evidence
+only.
 
 ## End-to-end flow
 
 ```text
 User question
   → source routing
-  → parallel source retrieval
+  → parallel source retrieval tools
   → MongoDB Atlas Search / Vector Search / rank fusion
   → Voyage reranking
   → deterministic reconciliation
@@ -119,7 +122,8 @@ The hybrid path uses MongoDB `$rankFusion` over Atlas Vector Search and Atlas Se
 }}
 ```
 
-This is the main MongoDB value point: multiple source-specific searches are parallelized, authorized, and fused before answer generation.
+This is the main MongoDB value point: multiple source-specific retrieval tools run parallel,
+authorized searches and return evidence before answer generation.
 
 ## 3. Reranking
 
@@ -186,7 +190,8 @@ This architecture reduces latency and improves governance because it does not as
 
 Instead:
 
-- MongoDB routes and retrieves authorized evidence across sources.
+- LangGraph routes to source-scoped retrieval tools.
+- MongoDB retrieves authorized evidence across selected sources.
 - Atlas Search, Vector Search, and `$rankFusion` generate strong candidates.
 - Voyage reranking improves semantic ordering when available.
 - Deterministic reconciliation combines semantic relevance, authority, and freshness.

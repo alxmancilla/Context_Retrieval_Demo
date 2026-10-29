@@ -32,6 +32,7 @@ Enterprise knowledge is fragmented across many tools:
 The demo shows a governed RAG pattern that can:
 
 - Search across multiple enterprise source systems.
+- Call source-scoped retrieval tools, not answer-generating subagents.
 - Enforce tenant and access-control filters before generation.
 - Combine semantic and keyword retrieval.
 - Rerank evidence with Voyage `rerank-3`.
@@ -45,7 +46,9 @@ The demo shows a governed RAG pattern that can:
 
 ![Solution architecture](../public/solution-architecture.png)
 
-The assistant coordinates retrieval, reranking, reconciliation, generation, citations, and memory through a deterministic LangGraph workflow backed by MongoDB Atlas.
+The assistant coordinates thin retrieval tools, reranking, reconciliation, generation, citations, and
+memory through a deterministic LangGraph workflow backed by MongoDB Atlas. The tools return evidence
+only; they do not write competing answers.
 
 ---
 
@@ -158,10 +161,10 @@ It rejects memory writes for normal enterprise Q&A, degraded responses, or low-c
 ## 12. Suggested live demo flow
 
 1. Ask a broad enterprise policy question.
-2. Show retrieval from all five source types.
-3. Ask a question with conflicting evidence.
-4. Show contradiction handling and preferred evidence.
-5. Ask a follow-up question to demonstrate short-term context.
+2. Show retrieval from all five source tools.
+3. Ask a targeted 2-source or 3-source question.
+4. Ask a question with conflicting evidence.
+5. Show contradiction handling and preferred evidence.
 6. Open the evidence inspector to show citations, scores, and conflicts.
 
 ---
