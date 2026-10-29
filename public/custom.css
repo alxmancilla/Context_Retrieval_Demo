@@ -1,3 +1,4 @@
+/* modern-chat-ui-v2: stronger ChatGPT/Claude-like Chainlit shell */
 :root {
   --chat-bg: #f7f7f4;
   --chat-surface: #ffffff;
@@ -45,6 +46,18 @@ header .logo { filter: drop-shadow(0 4px 12px rgba(18, 128, 92, 0.18)); }
 
 main {
   background: transparent !important;
+}
+
+main > div {
+  max-width: var(--chat-width);
+  margin-inline: auto;
+}
+
+main [data-testid*="message"],
+main [class*="message"],
+main [class*="Message"] {
+  max-width: var(--chat-width);
+  margin-inline: auto;
 }
 
 aside {
@@ -101,6 +114,20 @@ button:focus-visible, textarea:focus-visible, input:focus-visible {
   background: color-mix(in srgb, var(--chat-surface) 96%, transparent) !important;
   box-shadow: var(--chat-shadow);
   backdrop-filter: blur(18px) saturate(1.08);
+}
+
+form:has(textarea),
+form:has([contenteditable="true"]),
+[class*="composer"],
+[class*="Composer"] {
+  max-width: var(--chat-width) !important;
+  margin-inline: auto !important;
+}
+
+textarea,
+[contenteditable="true"] {
+  border-radius: 1.1rem !important;
+  background: transparent !important;
 }
 
 #message-composer:focus-within {

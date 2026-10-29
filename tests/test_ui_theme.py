@@ -29,7 +29,10 @@ def test_modern_chat_theme_assets_and_configuration():
         assert variables["--background"]
         assert variables["--radius"] == "1rem"
     assert "--chat-width: min(100%, 52rem)" in css
+    assert "modern-chat-ui-v2" in css
     assert "#message-composer" in css
+    assert "form:has(textarea)" in css
+    assert "[contenteditable=\"true\"]" in css
     assert "backdrop-filter: blur(18px)" in css
 
 
