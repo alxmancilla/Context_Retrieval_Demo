@@ -1,24 +1,17 @@
-# How can I help with your enterprise context?
+# Try the MongoDB-backed context assistant
 
-Ask a natural-language question across simulated **GitHub, Confluence, Jira, SharePoint, and Teams**.
+Click a **sample question** below to show how MongoDB helps the customer move from slow
+multi-agent answer merging to fast, governed evidence retrieval.
 
-The coordinator searches source specialists in parallel, uses Voyage AI to rerank authorized
-evidence, and combines semantic relevance, governed authority, and freshness. When sources
-conflict, it identifies one current or authoritative representative per value, distinguishes
-historical suggestions from effective policy, and reports the score margin.
+The assistant uses MongoDB Atlas as the operational retrieval plane: source metadata, Atlas Search,
+Vector Search, rank fusion, checkpoints, semantic memory, and evidence audit trails. It routes
+sources, retrieves evidence in parallel, reconciles conflicts, and generates one cited answer.
 
-Every factual citation is bound to a retrieved artifact. Expand **Agent activity** only when you
-want the details: Atlas scores, Voyage rerank scores, governance, contradiction representatives,
-lifecycle status, and the final deterministic decision.
+**Recommended demo flow**
 
-Embeddings are managed by Atlas Automated Embedding indexes over the `content` field, so you will
-not see `embedding` arrays in the collections. Source retrieval combines Atlas Vector Search,
-lexical Search, ACL filters, and `$rankFusion`; Voyage reranks only authorized candidates. The
-retrieval inspector also shows the active source routing mode: `intent`, `all`, or `explicit_only`.
+1. Start with **Reduce multi-agent RAG latency** to frame the customer problem.
+2. Try **Merge evidence, not answers** to show the MongoDB retrieval advantage.
+3. Run **Resolve the OAuth conflict** to show governed evidence and auditability.
+4. Finish with **Executive value summary** for a customer-ready MongoDB value story.
 
-## Visual architecture
-
-[![Open the solution architecture diagram](/public/solution-architecture.png)](/public/solution-architecture.png)
-
-Use the preview above, or the **Architecture** link in the header, to open the visual design
-diagram only when you want it.
+Use the **Architecture** link in the header when you want the visual solution diagram.

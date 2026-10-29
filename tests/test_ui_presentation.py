@@ -2,6 +2,7 @@ from ui.presentation import (
     contradictions_markdown,
     evidence_markdown,
     intent_markdown,
+    pipeline_trace_markdown,
     retrieval_pipeline_markdown,
     source_result_markdown,
 )
@@ -76,3 +77,26 @@ def test_retrieval_pipeline_inspector_explains_hybrid_search_and_models():
     assert "Source routing mode" in rendered
     assert "all-source ablations" in rendered
     assert "Hybrid `$rankFusion` hits: `1`" in rendered
+
+
+def test_pipeline_trace_shows_routing_retrieval_and_reranking_inline():
+    rendered = pipeline_trace_markdown(
+        {
+            "intent": "customer_latency",
+            "sources": ["github", "jira"],
+            "rewritten_query": "reduce rag latency",
+        },
+        {"github": [_hit()], "jira": []},
+        [_hit()],
+        [],
+        [],
+        rerank_model="rerank-3",
+        routing_mode="intent",
+    )
+    assert "Pipeline trace" in rendered
+    assert "evidence, not answers" in rendered
+    assert "Source routing" in rendered
+    assert "Parallel retrieval" in rendered
+    assert "Reranking" in rendered
+    assert "rerank-3" in rendered
+    assert "Top reranked evidence" in rendered

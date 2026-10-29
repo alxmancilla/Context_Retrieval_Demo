@@ -88,6 +88,56 @@ def evidence_markdown(hits: list[dict]) -> str:
     return "\n".join(rows)
 
 
+def pipeline_trace_markdown(
+    intent: dict, source_results: dict[str, list[dict]], ranked_hits: list[dict],
+    contradictions: list[dict], degraded: list[str], *, rerank_model: str,
+    routing_mode: str = "intent",
+) -> str:
+    """Customer-facing trace from routing through reranking."""
+    selected = intent.get("sources") or sorted(source_results)
+    routed = ", ".join(SOURCE_LABELS.get(source, source) for source in selected) or "none"
+    source_counts = {
+        SOURCE_LABELS.get(source, source.title()): len(hits)
+        for source, hits in sorted(source_results.items())
+    }
+    retrieved = sum(source_counts.values())
+    reranked = sum(1 for hit in ranked_hits if hit.get("rerank_score") is not None)
+    rows = [
+        "## Pipeline trace",
+        "This shows how the assistant merged **evidence, not answers**, before writing the final response.",
+        "",
+        "| Stage | What happened |",
+        "|---|---|",
+        f"| 1. Source routing | Mode `{routing_mode}` selected **{routed}** for intent `{intent.get('intent', 'unknown')}`. |",
+        f"| 2. Parallel retrieval | Retrieved **{retrieved}** authorized candidate(s) across **{len(source_counts)}** source(s). |",
+        f"| 3. Reranking | Voyage `{rerank_model}` reranked **{reranked}** candidate(s); Atlas vector score remains fallback. |",
+        f"| 4. Reconciliation | Ranked **{len(ranked_hits)}** evidence item(s) and found **{len(contradictions)}** contradiction group(s). |",
+    ]
+    if source_counts:
+        rows.extend(["", "**Retrieved by source:**"])
+        rows.append(", ".join(f"{source}: `{count}`" for source, count in source_counts.items()))
+    if ranked_hits:
+        rows.extend([
+            "",
+            "**Top reranked evidence:**",
+            "| # | Source | Artifact | Rerank | Truth |",
+            "|---:|---|---|---:|---:|",
+        ])
+        for rank, hit in enumerate(ranked_hits[:5], 1):
+            title = str(hit.get("title", "Untitled")).replace("|", "\\|")
+            source = str(hit.get("source", "unknown"))
+            rerank = hit.get("rerank_score")
+            rerank_display = f"{rerank:.3f}" if rerank is not None else "—"
+            rows.append(
+                f"| {rank} | {SOURCE_LABELS.get(source, source)} | "
+                f"[{title}]({hit.get('url', '#')}) | {rerank_display} | "
+                f"{float(hit.get('truth_score', 0.0)):.3f} |"
+            )
+    if degraded:
+        rows.extend(["", f"**Degraded markers:** `{', '.join(degraded)}`"])
+    return "\n".join(rows)
+
+
 def retrieval_pipeline_markdown(
     source_results: dict[str, list[dict]], ranked_hits: list[dict],
     contradictions: list[dict], degraded: list[str], *, rerank_model: str,

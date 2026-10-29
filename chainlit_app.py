@@ -26,6 +26,7 @@ from ui.presentation import (
     evidence_markdown,
     intent_markdown,
     memories_markdown,
+    pipeline_trace_markdown,
     retrieval_pipeline_markdown,
     source_result_markdown,
 )
@@ -47,19 +48,29 @@ _RUNTIME: AppRuntime | None = None
 _RUNTIME_LOCK = asyncio.Lock()
 
 
-STARTER_PROMPTS = (
-    ("Rx partner authentication", "How do external partners authenticate to the Rx API today, and are any sources outdated?"),
-    ("Prior auth status delivery", "For prior auth, should clients poll for status or consume events? What changed and when?"),
-    ("Eligibility cache strategy", "What is the current eligibility caching strategy? Include TTL values and the incident that drove the change."),
-    ("PHI logging policy", "What is the documented PHI logging policy, and how does it differ from old troubleshooting practices?"),
-    ("Partner network controls", "What Atlas network and transport controls are required for production Rx partner connectivity, and which evidence verifies them?"),
-    ("PA event resilience", "How does prior authorization event delivery handle idempotency, stream lag, failures, and dead-letter processing?"),
-    ("Negative cache TTL", "What are the positive and negative eligibility cache TTLs, and why are they different?"),
-    ("PHI-safe troubleshooting", "How should engineers troubleshoot a PHI-related production incident without logging raw payloads?"),
-    ("Resolve the OAuth conflict", "Compare OAuth claims in GitHub, Jira, Confluence, and Teams. Which claim wins under authority and freshness, and why?"),
-    ("Trace the cache decision", "Build a timeline from the 60-minute eligibility cache design to the current deployment. Cite the incident, ticket, and implementation."),
-    ("Audit the PA migration", "Summarize evidence that tier-1 prior authorization consumers migrated from polling to events and identify any remaining exceptions."),
-    ("Enterprise control coverage", "Across Partner Integration Gateway, Member API, and Provider API, summarize current authentication controls using implementation, architecture, rollout, and compliance evidence."),
+SAMPLE_QUESTION_GROUPS = (
+    ("MongoDB latency wins", (
+        ("Reduce multi-agent RAG latency", "For this customer scenario, how does MongoDB Atlas help replace multiple answer-generating agents with parallel evidence retrieval, central reconciliation, and one final grounded answer?"),
+        ("Merge evidence, not answers", "Show how Atlas Search, Vector Search, and rank fusion can merge evidence from GitHub, Confluence, Jira, SharePoint, and Teams before the final LLM call."),
+        ("One retrieval plane", "What is the benefit of using MongoDB as the shared metadata, search, vector, checkpoint, and memory layer for this agentic RAG workflow?"),
+        ("Prove latency improvement", "How should we benchmark intent routing, all-source retrieval, and explicit source selection to prove the MongoDB-backed workflow lowers end-to-end latency?"),
+    )),
+    ("Governed evidence demos", (
+        ("Resolve the OAuth conflict", "Compare OAuth claims in GitHub, Jira, Confluence, and Teams. Which claim wins under authority and freshness, and how does MongoDB preserve the evidence trail?"),
+        ("Trace the cache decision", "Build a timeline from the 60-minute eligibility cache design to the current deployment, citing the incident, Jira ticket, and implementation evidence stored in MongoDB."),
+        ("PHI-safe troubleshooting", "How does the MongoDB-backed assistant answer a PHI troubleshooting question with governed evidence while avoiding unsafe raw payload logging?"),
+        ("Verify answer citations", "How does the workflow ensure every factual claim in the answer is backed by a retrieved MongoDB artifact and not by an unsupported model summary?"),
+    )),
+    ("Production readiness", (
+        ("Atlas controls for partners", "What MongoDB Atlas network, encryption, access-control, and operational controls are required for production Rx partner connectivity, and which artifacts verify them?"),
+        ("Checkpoint and memory value", "How do MongoDB checkpoints and semantic memory preserve useful conversation context without treating memory as factual authority?"),
+        ("Prior auth event resilience", "How does the prior authorization workflow handle idempotency, stream lag, failures, and dead-letter recovery, and where does MongoDB help operations?"),
+        ("Executive value summary", "Summarize the customer value of MongoDB for this agentic RAG use case: latency, governance, citations, auditability, and production operations."),
+    )),
+)
+
+STARTER_PROMPTS = tuple(
+    prompt for _group, prompts in SAMPLE_QUESTION_GROUPS for prompt in prompts
 )
 
 
@@ -104,6 +115,21 @@ if configured_auth_mode() == "oauth":
 @cl.set_starters
 async def starters(_user: cl.User | None) -> list[cl.Starter]:
     return [cl.Starter(label=label, message=message) for label, message in STARTER_PROMPTS]
+
+
+@cl.set_starter_categories
+async def starter_categories(_user: cl.User | None) -> list[cl.StarterCategory]:
+    return [
+        cl.StarterCategory(
+            label=group,
+            icon="/public/leaf-mark.svg",
+            starters=[
+                cl.Starter(label=label, message=message)
+                for label, message in prompts
+            ],
+        )
+        for group, prompts in SAMPLE_QUESTION_GROUPS
+    ]
 
 
 def _build_runtime(settings: Settings) -> AppRuntime:
@@ -350,7 +376,19 @@ async def on_message(message: cl.Message) -> None:
         warning = ""
         if result.get("degraded"):
             warning = f"\n\n> ⚠️ Degraded capabilities: {', '.join(result['degraded'])}"
-        status.content = result.get("answer", "No answer was generated.") + warning
+        trace = pipeline_trace_markdown(
+            result.get("intent", {}),
+            result.get("source_results", {}),
+            result.get("ranked_hits", []),
+            result.get("contradictions", []),
+            result.get("degraded", []),
+            rerank_model=settings.voyage_rerank_model,
+            routing_mode=settings.source_routing_mode,
+        )
+        status.content = (
+            f"{trace}\n\n---\n\n## Final cited answer\n\n"
+            f"{result.get('answer', 'No answer was generated.')}{warning}"
+        )
         # Chainlit models this field with an unbound ElementBased type variable.
         status.elements = cast(Any, elements)
         await status.update()

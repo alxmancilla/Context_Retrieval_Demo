@@ -1,4 +1,4 @@
-/* modern-chat-ui-v2: stronger ChatGPT/Claude-like Chainlit shell */
+/* modern-chat-ui-v3: sample-question launcher with stronger ChatGPT/Claude-like shell */
 :root {
   --chat-bg: #f7f7f4;
   --chat-surface: #ffffff;
@@ -93,17 +93,39 @@ button:focus-visible, textarea:focus-visible, input:focus-visible {
 .markdown-body a { text-underline-offset: 3px; }
 
 [id^="starter-"] {
-  min-height: 3.15rem;
+  min-height: 4.25rem;
   border: 1px solid var(--chat-border) !important;
-  border-radius: 1rem !important;
+  border-radius: 1.15rem !important;
   background: color-mix(in srgb, var(--chat-surface) 92%, var(--chat-accent-soft)) !important;
   box-shadow: 0 3px 14px rgba(31, 35, 40, 0.05);
+  justify-content: flex-start !important;
+  padding: 0.9rem 1rem !important;
+  text-align: left !important;
+  white-space: normal !important;
 }
 
 [id^="starter-"]:hover:not(:disabled) {
   background: var(--chat-surface) !important;
   box-shadow: 0 12px 30px rgba(31, 35, 40, 0.10);
   transform: translateY(-2px);
+}
+
+[id^="starter-"]::after {
+  content: "Run sample →";
+  margin-left: auto;
+  color: var(--chat-accent);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+[class*="starter"],
+[class*="Starter"] {
+  gap: 0.8rem !important;
+}
+
+[class*="starter"] button,
+[class*="Starter"] button {
+  border-radius: 1.15rem !important;
 }
 
 #message-composer {
